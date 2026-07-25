@@ -25,11 +25,11 @@ export const BulkSubmitModal: React.FC<BulkSubmitModalProps> = ({ isOpen, onClos
   const totalCount = lines.length;
   const estimatedEarn = totalCount * (currentCategoryObj ? currentCategoryObj.ratePerUnit : 0);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setResultMessage(null);
 
-    const res = submitBatchEmails(selectedCategory, rawInput);
+    const res = await submitBatchEmails(selectedCategory, rawInput);
     if (res.success) {
       setResultMessage({ success: true, text: res.message });
       setRawInput('');

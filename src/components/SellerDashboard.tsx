@@ -43,10 +43,10 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({ openSubmitModa
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const handleWithdrawSubmit = (e: React.FormEvent) => {
+  const handleWithdrawSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setWithdrawNotice(null);
-    const res = requestWithdrawal(withdrawAmount, withdrawMethod, accountDetails);
+    const res = await requestWithdrawal(withdrawAmount, withdrawMethod, accountDetails);
     if (res.success) {
       setWithdrawNotice({ success: true, text: res.message });
       setTimeout(() => {

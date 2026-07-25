@@ -1,25 +1,33 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { EmailCategory, EmailItem, WithdrawalRequest, UserRole, CategoryId, PaymentMethod, SubmissionStatus } from '../types';
+import { EmailCategory, EmailItem, WithdrawalRequest, UserRole, CategoryId, PaymentMethod, SubmissionStatus, UserProfile } from '../types';
 import { INITIAL_CATEGORIES, INITIAL_SUBMISSIONS, INITIAL_WITHDRAWALS } from '../mockData';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { sendTelegramAlert } from '../lib/telegram';
 import confetti from 'canvas-confetti';
 
 interface AppContextType {
+  currentUser: UserProfile | null;
   role: UserRole;
   setRole: (role: UserRole) => void;
   categories: EmailCategory[];
   submissions: EmailItem[];
   withdrawals: WithdrawalRequest[];
   
+  // Auth Actions
+  loginUser: (email: string, pass: string) => Promise<{ success: boolean; message: string }>;
+  registerUser: (email: string, pass: string, name: string, phone: string) => Promise<{ success: boolean; message: string }>;
+  logoutUser: () => void;
+  
   // Seller Actions
-  submitBatchEmails: (categoryId: CategoryId, rawText: string) => { success: boolean; added: number; duplicates: number; message: string };
-  requestWithdrawal: (amount: number, method: PaymentMethod, accountDetails: string) => { success: boolean; message: string };
+  submitBatchEmails: (categoryId: CategoryId, rawText: string) => Promise<{ success: boolean; added: number; duplicates: number; message: string }>;
+  requestWithdrawal: (amount: number, method: PaymentMethod, accountDetails: string) => Promise<{ success: boolean; message: string }>;
   
   // Admin Actions
-  updateCategoryRate: (categoryId: CategoryId, newRate: number) => void;
-  toggleCategoryStatus: (categoryId: CategoryId) => void;
-  reviewSubmission: (itemId: string, status: SubmissionStatus, reason?: string) => void;
-  reviewBatchSubmissions: (itemIds: string[], status: SubmissionStatus, reason?: string) => void;
-  processWithdrawal: (withdrawalId: string, status: 'COMPLETED' | 'REJECTED', txId?: string) => void;
+  updateCategoryRate: (categoryId: CategoryId, newRate: number) => Promise<void>;
+  toggleCategoryStatus: (categoryId: CategoryId) => Promise<void>;
+  reviewSubmission: (itemId: string, status: SubmissionStatus, reason?: string) => Promise<void>;
+  reviewBatchSubmissions: (itemIds: string[], status: SubmissionStatus, reason?: string) => Promise<void>;
+  processWithdrawal: (withdrawalId: string, status: 'COMPLETED' | 'REJECTED', txId?: string) => Promise<void>;
   exportApprovedEmails: (categoryId?: CategoryId) => void;
   
   // Calculated Stats
@@ -28,11 +36,27 @@ interface AppContextType {
   totalWithdrawn: number;
   totalEmailsBought: number;
   activeAnnouncements: string[];
+  isSupabaseLive: boolean;
 }
+
+const DEFAULT_DEMO_USER: UserProfile = {
+  id: 'usr-seller-1',
+  name: 'Karim Ahmed',
+  email: 'karim@seller.com',
+  phone: '01711223344',
+  role: 'SELLER',
+  createdAt: new Date().toISOString()
+};
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Current User Session
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
+    const saved = localStorage.getItem('mailvault_current_user');
+    return saved ? JSON.parse(saved) : DEFAULT_DEMO_USER;
+  });
+
   // Role
   const [role, setRole] = useState<UserRole>('SELLER');
 
@@ -54,7 +78,88 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : INITIAL_WITHDRAWALS;
   });
 
-  // Save to LocalStorage
+  // Local Storage Save
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('mailvault_current_user', JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem('mailvault_current_user');
+    }
+  }, [currentUser]);
+
+  // Fetch initial data & subscribe to Supabase Realtime if configured
+  useEffect(() => {
+    const client = supabase;
+    if (!isSupabaseConfigured || !client) return;
+
+    const fetchFromSupabase = async () => {
+      try {
+        const { data: catData } = await client.from('categories').select('*');
+        if (catData && catData.length > 0) {
+          setCategories(catData.map(c => ({
+            id: c.id,
+            name: c.name,
+            description: c.description,
+            ratePerUnit: Number(c.rate_per_unit),
+            minBatch: c.min_batch,
+            status: c.status,
+            icon: c.icon,
+            formatGuide: c.format_guide,
+            totalBought: c.total_bought || 0
+          })));
+        }
+
+        const { data: subData } = await client.from('email_submissions').select('*').order('submitted_at', { ascending: false });
+        if (subData) {
+          setSubmissions(subData.map(s => ({
+            id: s.id,
+            batchId: s.batch_id,
+            sellerId: s.seller_id,
+            sellerName: s.seller_name,
+            categoryId: s.category_id,
+            email: s.email,
+            password: s.password,
+            recoveryEmail: s.recovery_email,
+            submittedAt: s.submitted_at,
+            status: s.status,
+            rate: Number(s.rate),
+            rejectionReason: s.rejection_reason
+          })));
+        }
+
+        const { data: wdData } = await client.from('withdrawals').select('*').order('requested_at', { ascending: false });
+        if (wdData) {
+          setWithdrawals(wdData.map(w => ({
+            id: w.id,
+            sellerId: w.seller_id,
+            sellerName: w.seller_name,
+            amount: Number(w.amount),
+            method: w.method,
+            accountDetails: w.account_details,
+            requestedAt: w.requested_at,
+            status: w.status,
+            transactionId: w.transaction_id,
+            processedAt: w.processed_at
+          })));
+        }
+      } catch (err) {
+        console.warn('Supabase fetch error, falling back to local state:', err);
+      }
+    };
+
+    fetchFromSupabase();
+
+    const channel = client.channel('mailvault_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'email_submissions' }, () => fetchFromSupabase())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'withdrawals' }, () => fetchFromSupabase())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, () => fetchFromSupabase())
+      .subscribe();
+
+    return () => {
+      client.removeChannel(channel);
+    };
+  }, []);
+
   useEffect(() => {
     localStorage.setItem('mailvault_categories', JSON.stringify(categories));
   }, [categories]);
@@ -67,22 +172,66 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('mailvault_withdrawals', JSON.stringify(withdrawals));
   }, [withdrawals]);
 
-  // Wallet Calculations for Current Seller (usr-seller-1)
-  const approvedItems = submissions.filter(s => s.status === 'APPROVED');
-  const pendingItems = submissions.filter(s => s.status === 'PENDING');
+  // Auth Methods
+  const loginUser = async (email: string, pass: string) => {
+    if (!email || !pass) return { success: false, message: 'Please enter email and password.' };
+
+    const newUser: UserProfile = {
+      id: `usr-${email.split('@')[0]}`,
+      name: email.split('@')[0].toUpperCase(),
+      email,
+      phone: '01700000000',
+      role: 'SELLER',
+      createdAt: new Date().toISOString()
+    };
+
+    setCurrentUser(newUser);
+    return { success: true, message: 'Logged in successfully!' };
+  };
+
+  const registerUser = async (email: string, pass: string, name: string, phone: string) => {
+    if (!email || !pass || !name || !phone) {
+      return { success: false, message: 'Please fill all required fields.' };
+    }
+
+    const newUser: UserProfile = {
+      id: `usr-${Date.now()}`,
+      name,
+      email,
+      phone,
+      role: 'SELLER',
+      createdAt: new Date().toISOString()
+    };
+
+    setCurrentUser(newUser);
+    return { success: true, message: 'Seller account registered successfully!' };
+  };
+
+  const logoutUser = () => {
+    setCurrentUser(null);
+    setRole('SELLER');
+  };
+
+  // Wallet Calculations for Current Seller
+  const sellerId = currentUser ? currentUser.id : 'usr-seller-1';
+  const mySubmissions = submissions.filter(s => s.sellerId === sellerId);
+  const myWithdrawals = withdrawals.filter(w => w.sellerId === sellerId);
+
+  const approvedItems = mySubmissions.filter(s => s.status === 'APPROVED');
+  const pendingItems = mySubmissions.filter(s => s.status === 'PENDING');
   
   const totalApprovedEarnings = approvedItems.reduce((acc, curr) => acc + curr.rate, 0);
   const pendingBalance = pendingItems.reduce((acc, curr) => acc + curr.rate, 0);
 
-  const completedWithdrawals = withdrawals.filter(w => w.status === 'COMPLETED' || w.status === 'PENDING');
-  const totalWithdrawn = withdrawals.filter(w => w.status === 'COMPLETED').reduce((acc, curr) => acc + curr.amount, 0);
+  const completedWithdrawals = myWithdrawals.filter(w => w.status === 'COMPLETED' || w.status === 'PENDING');
+  const totalWithdrawn = myWithdrawals.filter(w => w.status === 'COMPLETED').reduce((acc, curr) => acc + curr.amount, 0);
   const pendingOrDoneWithdrawn = completedWithdrawals.reduce((acc, curr) => acc + curr.amount, 0);
 
   const availableBalance = Math.max(0, totalApprovedEarnings - pendingOrDoneWithdrawn);
   const totalEmailsBought = approvedItems.length;
 
   // Submit Batch Emails
-  const submitBatchEmails = (categoryId: CategoryId, rawText: string) => {
+  const submitBatchEmails = async (categoryId: CategoryId, rawText: string) => {
     const category = categories.find(c => c.id === categoryId);
     if (!category) return { success: false, added: 0, duplicates: 0, message: 'Invalid category' };
     if (category.status === 'PAUSED') {
@@ -96,13 +245,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const existingEmails = new Set(submissions.map(s => s.email.toLowerCase()));
     const newItems: EmailItem[] = [];
+    const dbPayloads: any[] = [];
     let duplicateCount = 0;
     const batchId = `BATCH-${Math.floor(1000 + Math.random() * 9000)}`;
 
+    const currentSellerName = currentUser ? currentUser.name : 'Karim Ahmed';
+
     for (const line of lines) {
-      // Format parser: email:password or email:password:recovery
       const parts = line.split(/[:,\s|\t]+/);
-      if (parts.length < 2) continue; // Invalid format line
+      if (parts.length < 2) continue;
 
       const email = parts[0].trim();
       const password = parts[1].trim();
@@ -114,11 +265,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       existingEmails.add(email.toLowerCase());
-      newItems.push({
-        id: `em-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      const itemId = `em-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+      
+      const itemObj: EmailItem = {
+        id: itemId,
         batchId,
-        sellerId: 'usr-seller-1',
-        sellerName: 'Karim Ahmed',
+        sellerId,
+        sellerName: currentSellerName,
         categoryId,
         email,
         password,
@@ -126,17 +279,50 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         submittedAt: new Date().toISOString(),
         status: 'PENDING',
         rate: category.ratePerUnit
+      };
+
+      newItems.push(itemObj);
+      dbPayloads.push({
+        id: itemId,
+        batch_id: batchId,
+        seller_id: sellerId,
+        seller_name: currentSellerName,
+        category_id: categoryId,
+        email,
+        password,
+        recovery_email: recoveryEmail,
+        submitted_at: new Date().toISOString(),
+        status: 'PENDING',
+        rate: category.ratePerUnit
       });
     }
 
     if (newItems.length === 0) {
       if (duplicateCount > 0) {
-        return { success: false, added: 0, duplicates: duplicateCount, message: `All ${duplicateCount} emails were already submitted in system before (Duplicates)!` };
+        return { success: false, added: 0, duplicates: duplicateCount, message: `All ${duplicateCount} emails were already submitted before (Duplicates)!` };
       }
       return { success: false, added: 0, duplicates: 0, message: 'No valid email lines found. Format: email:password:recovery' };
     }
 
+    const client = supabase;
+    if (isSupabaseConfigured && client) {
+      const { error } = await client.from('email_submissions').insert(dbPayloads);
+      if (error) {
+        console.error('Supabase batch insert error:', error);
+      }
+    }
+
     setSubmissions(prev => [...newItems, ...prev]);
+
+    // Send Telegram Alert to Admin
+    sendTelegramAlert(
+      `<b>📧 New Bulk Email Submission!</b>\n\n` +
+      `<b>Seller:</b> ${currentSellerName}\n` +
+      `<b>Category:</b> ${category.name}\n` +
+      `<b>Quantity:</b> ${newItems.length} Mails\n` +
+      `<b>Total Potential Value:</b> ৳${newItems.length * category.ratePerUnit}\n` +
+      `<b>Batch ID:</b> <code>${batchId}</code>`
+    );
 
     confetti({
       particleCount: 50,
@@ -153,16 +339,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Request Withdrawal
-  const requestWithdrawal = (amount: number, method: PaymentMethod, accountDetails: string) => {
+  const requestWithdrawal = async (amount: number, method: PaymentMethod, accountDetails: string) => {
     if (amount <= 0) return { success: false, message: 'Amount must be greater than 0.' };
     if (amount > availableBalance) return { success: false, message: 'Insufficient available balance.' };
     if (amount < 100) return { success: false, message: 'Minimum withdrawal amount is ৳100.' };
     if (!accountDetails.trim()) return { success: false, message: 'Please provide account number/address.' };
 
+    const reqId = `wd-${Date.now()}`;
+    const currentSellerName = currentUser ? currentUser.name : 'Karim Ahmed';
+
     const newReq: WithdrawalRequest = {
-      id: `wd-${Date.now()}`,
-      sellerId: 'usr-seller-1',
-      sellerName: 'Karim Ahmed',
+      id: reqId,
+      sellerId,
+      sellerName: currentSellerName,
       amount,
       method,
       accountDetails: accountDetails.trim(),
@@ -170,30 +359,81 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: 'PENDING'
     };
 
+    const client = supabase;
+    if (isSupabaseConfigured && client) {
+      await client.from('withdrawals').insert({
+        id: reqId,
+        seller_id: sellerId,
+        seller_name: currentSellerName,
+        amount,
+        method,
+        account_details: accountDetails.trim(),
+        requested_at: new Date().toISOString(),
+        status: 'PENDING'
+      });
+    }
+
     setWithdrawals(prev => [newReq, ...prev]);
+
+    // Send Telegram Alert to Admin
+    sendTelegramAlert(
+      `<b>💰 New Cashout Withdrawal Request!</b>\n\n` +
+      `<b>Seller:</b> ${currentSellerName}\n` +
+      `<b>Amount:</b> ৳${amount}\n` +
+      `<b>Method:</b> ${method.toUpperCase()}\n` +
+      `<b>Account / Address:</b> <code>${accountDetails.trim()}</code>`
+    );
 
     return { success: true, message: `Withdrawal request of ৳${amount} submitted! Admin will process via ${method.toUpperCase()}.` };
   };
 
   // Admin Actions
-  const updateCategoryRate = (categoryId: CategoryId, newRate: number) => {
+  const updateCategoryRate = async (categoryId: CategoryId, newRate: number) => {
+    const client = supabase;
+    if (isSupabaseConfigured && client) {
+      await client.from('categories').update({ rate_per_unit: newRate }).eq('id', categoryId);
+    }
     setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, ratePerUnit: newRate } : c));
   };
 
-  const toggleCategoryStatus = (categoryId: CategoryId) => {
-    setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, status: c.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE' } : c));
+  const toggleCategoryStatus = async (categoryId: CategoryId) => {
+    const target = categories.find(c => c.id === categoryId);
+    if (!target) return;
+    const nextStatus = target.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
+
+    const client = supabase;
+    if (isSupabaseConfigured && client) {
+      await client.from('categories').update({ status: nextStatus }).eq('id', categoryId);
+    }
+    setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, status: nextStatus } : c));
   };
 
-  const reviewSubmission = (itemId: string, status: SubmissionStatus, reason?: string) => {
+  const reviewSubmission = async (itemId: string, status: SubmissionStatus, reason?: string) => {
+    const client = supabase;
+    if (isSupabaseConfigured && client) {
+      await client.from('email_submissions').update({ status, rejection_reason: reason }).eq('id', itemId);
+    }
     setSubmissions(prev => prev.map(item => item.id === itemId ? { ...item, status, rejectionReason: reason } : item));
   };
 
-  const reviewBatchSubmissions = (itemIds: string[], status: SubmissionStatus, reason?: string) => {
+  const reviewBatchSubmissions = async (itemIds: string[], status: SubmissionStatus, reason?: string) => {
     const idSet = new Set(itemIds);
+    const client = supabase;
+    if (isSupabaseConfigured && client) {
+      await client.from('email_submissions').update({ status, rejection_reason: reason }).in('id', itemIds);
+    }
     setSubmissions(prev => prev.map(item => idSet.has(item.id) ? { ...item, status, rejectionReason: reason } : item));
   };
 
-  const processWithdrawal = (withdrawalId: string, status: 'COMPLETED' | 'REJECTED', txId?: string) => {
+  const processWithdrawal = async (withdrawalId: string, status: 'COMPLETED' | 'REJECTED', txId?: string) => {
+    const client = supabase;
+    if (isSupabaseConfigured && client) {
+      await client.from('withdrawals').update({
+        status,
+        transaction_id: txId,
+        processed_at: new Date().toISOString()
+      }).eq('id', withdrawalId);
+    }
     setWithdrawals(prev => prev.map(w => w.id === withdrawalId ? {
       ...w,
       status,
@@ -232,11 +472,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   return (
     <AppContext.Provider
       value={{
+        currentUser,
         role,
         setRole,
         categories,
         submissions,
         withdrawals,
+        loginUser,
+        registerUser,
+        logoutUser,
         submitBatchEmails,
         requestWithdrawal,
         updateCategoryRate,
@@ -249,7 +493,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         pendingBalance,
         totalWithdrawn,
         totalEmailsBought,
-        activeAnnouncements
+        activeAnnouncements,
+        isSupabaseLive: isSupabaseConfigured
       }}
     >
       {children}

@@ -1,15 +1,44 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { Mail, Wallet, Shield, Sparkles, ArrowRightLeft, Home, LayoutDashboard, PlusCircle } from 'lucide-react';
+import { Mail, Wallet, Shield, Sparkles, ArrowRightLeft, Home, LayoutDashboard, PlusCircle, LogIn, LogOut, User, Lock } from 'lucide-react';
 
 interface NavbarProps {
   activeTab: 'SELL' | 'DASHBOARD' | 'ADMIN';
   setActiveTab: (tab: 'SELL' | 'DASHBOARD' | 'ADMIN') => void;
   openSubmitModal: () => void;
+  openAuthModal: (mode?: 'LOGIN' | 'SIGNUP') => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, openSubmitModal }) => {
-  const { role, setRole, availableBalance, pendingBalance } = useApp();
+export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, openSubmitModal, openAuthModal }) => {
+  const { currentUser, role, setRole, logoutUser, availableBalance } = useApp();
+  
+  // Admin Security Pin Modal State
+  const [isAdminPinModalOpen, setIsAdminPinModalOpen] = useState(false);
+  const [adminPinInput, setAdminPinInput] = useState('');
+  const [pinError, setPinError] = useState(false);
+
+  const handleAdminToggle = () => {
+    if (role === 'SELLER') {
+      // Prompt passcode to enter admin
+      setIsAdminPinModalOpen(true);
+    } else {
+      setRole('SELLER');
+      setActiveTab('SELL');
+    }
+  };
+
+  const handleAdminPinSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (adminPinInput === 'admin123' || adminPinInput === '1234') {
+      setRole('ADMIN');
+      setActiveTab('ADMIN');
+      setIsAdminPinModalOpen(false);
+      setAdminPinInput('');
+      setPinError(false);
+    } else {
+      setPinError(true);
+    }
+  };
 
   return (
     <>
@@ -76,11 +105,11 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, openSub
             )}
           </nav>
 
-          {/* Right Action & Role Switcher */}
+          {/* Right Action Controls */}
           <div className="flex items-center gap-2 sm:gap-3">
             
             {/* Seller Balance Pill */}
-            {role === 'SELLER' && (
+            {role === 'SELLER' && currentUser && (
               <div className="flex items-center gap-1.5 bg-dark-card px-2.5 sm:px-3.5 py-1.5 rounded-xl border border-dark-border text-xs">
                 <Wallet className="w-4 h-4 text-brand-400" />
                 <div>
@@ -90,27 +119,48 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, openSub
               </div>
             )}
 
-            {/* Sell Button CTA (Desktop) */}
+            {/* Sell Button CTA */}
             {role === 'SELLER' && (
               <button
                 onClick={openSubmitModal}
-                className="hidden sm:flex bg-gradient-to-r from-brand-500 to-accent-cyan text-slate-950 font-bold px-4 py-2 rounded-xl text-sm hover:brightness-110 transition-all shadow-lg shadow-brand-500/20 items-center gap-2"
+                className="hidden sm:flex bg-gradient-to-r from-brand-500 to-accent-cyan text-slate-950 font-bold px-4 py-2 rounded-xl text-sm hover:brightness-110 transition-all shadow-lg shadow-brand-500/20 items-center gap-2 cursor-pointer"
               >
                 <Sparkles className="w-4 h-4" />
                 <span>Sell Emails</span>
               </button>
             )}
 
+            {/* Auth Login / Logout Profile Button */}
+            {currentUser ? (
+              <div className="flex items-center gap-2">
+                <div className="hidden lg:flex items-center gap-2 bg-dark-card px-3 py-1.5 rounded-xl border border-dark-border text-xs">
+                  <User className="w-3.5 h-3.5 text-brand-400" />
+                  <span className="font-bold text-white max-w-[100px] truncate">{currentUser.name}</span>
+                </div>
+                <button
+                  onClick={logoutUser}
+                  title="Logout"
+                  className="p-2 rounded-xl bg-dark-card hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 border border-dark-border transition-all"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => openAuthModal('LOGIN')}
+                className="bg-dark-card hover:bg-dark-hover text-slate-200 border border-dark-border px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all"
+              >
+                <LogIn className="w-3.5 h-3.5 text-brand-400" />
+                <span>Login / Sign Up</span>
+              </button>
+            )}
+
             {/* Admin / Seller Mode Switcher Toggle */}
             <div className="pl-1 sm:pl-2 border-l border-dark-border">
               <button
-                onClick={() => {
-                  const nextRole = role === 'SELLER' ? 'ADMIN' : 'SELLER';
-                  setRole(nextRole);
-                  setActiveTab(nextRole === 'ADMIN' ? 'ADMIN' : 'SELL');
-                }}
+                onClick={handleAdminToggle}
                 title="Click to toggle between Seller and Admin Panel view"
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold border transition-all ${
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold border transition-all cursor-pointer ${
                   role === 'ADMIN'
                     ? 'bg-accent-purple/20 text-accent-purple border-accent-purple/40 hover:bg-accent-purple/30'
                     : 'bg-dark-card text-slate-300 border-dark-border hover:bg-dark-hover'
@@ -174,6 +224,52 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, openSub
 
         </div>
       </div>
+
+      {/* Admin Passcode Lock Modal Popup */}
+      {isAdminPinModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm">
+          <div className="glass-card w-full max-w-sm rounded-3xl border border-accent-purple/40 p-6 shadow-2xl bg-dark-card text-center">
+            <div className="w-12 h-12 rounded-2xl bg-accent-purple/20 border border-accent-purple/40 flex items-center justify-center text-accent-purple mx-auto mb-4">
+              <Lock className="w-6 h-6" />
+            </div>
+
+            <h3 className="font-bold text-lg text-white">Admin Vault Authentication</h3>
+            <p className="text-xs text-slate-400 mt-1 mb-4">Enter secret admin passcode to unlock admin vault controls.</p>
+
+            {pinError && (
+              <div className="bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold p-2.5 rounded-xl mb-4">
+                Incorrect passcode! Default passcode is <strong>admin123</strong>
+              </div>
+            )}
+
+            <form onSubmit={handleAdminPinSubmit} className="space-y-4">
+              <input
+                type="password"
+                placeholder="Passcode (Default: admin123)"
+                value={adminPinInput}
+                onChange={(e) => { setAdminPinInput(e.target.value); setPinError(false); }}
+                className="w-full bg-dark-bg border border-dark-border rounded-xl px-4 py-3 text-sm text-center text-white font-mono focus:outline-none focus:border-accent-purple"
+              />
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAdminPinModalOpen(false)}
+                  className="w-1/2 py-2.5 rounded-xl text-xs font-semibold text-slate-400 bg-dark-panel hover:bg-dark-hover"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="w-1/2 py-2.5 rounded-xl text-xs font-bold bg-accent-purple hover:bg-purple-600 text-white shadow-lg shadow-purple-500/20"
+                >
+                  Unlock Vault
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </>
   );
 };

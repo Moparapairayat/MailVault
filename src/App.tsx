@@ -7,6 +7,7 @@ import { RateCard } from './components/RateCard';
 import { BulkSubmitModal } from './components/BulkSubmitModal';
 import { SellerDashboard } from './components/SellerDashboard';
 import { AdminDashboard } from './components/AdminDashboard';
+import { AuthModal } from './components/AuthModal';
 import { Footer } from './components/Footer';
 import { CategoryId } from './types';
 
@@ -16,11 +17,20 @@ const MainLayout: React.FC = () => {
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [selectedSubmitCategory, setSelectedSubmitCategory] = useState<CategoryId>('gmail_fresh');
 
+  // Auth Modal State
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<'LOGIN' | 'SIGNUP'>('LOGIN');
+
   const handleOpenSubmitModal = (categoryId?: CategoryId) => {
     if (categoryId) {
       setSelectedSubmitCategory(categoryId);
     }
     setIsSubmitModalOpen(true);
+  };
+
+  const handleOpenAuthModal = (mode: 'LOGIN' | 'SIGNUP' = 'LOGIN') => {
+    setAuthMode(mode);
+    setIsAuthModalOpen(true);
   };
 
   return (
@@ -31,6 +41,7 @@ const MainLayout: React.FC = () => {
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           openSubmitModal={() => handleOpenSubmitModal()}
+          openAuthModal={handleOpenAuthModal}
         />
 
         {/* Running Live Marquee Ticker */}
@@ -54,6 +65,13 @@ const MainLayout: React.FC = () => {
         isOpen={isSubmitModalOpen}
         onClose={() => setIsSubmitModalOpen(false)}
         defaultCategoryId={selectedSubmitCategory}
+      />
+
+      {/* Global Auth Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        initialMode={authMode}
       />
 
       {/* Footer */}
