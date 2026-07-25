@@ -1,44 +1,16 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useApp } from '../context/AppContext';
-import { Mail, Wallet, Shield, Sparkles, ArrowRightLeft, Home, LayoutDashboard, PlusCircle, LogIn, LogOut, User, Lock } from 'lucide-react';
+import { Mail, Wallet, Sparkles, Home, LayoutDashboard, PlusCircle, LogIn, LogOut, User } from 'lucide-react';
 
 interface NavbarProps {
-  activeTab: 'SELL' | 'DASHBOARD' | 'ADMIN';
-  setActiveTab: (tab: 'SELL' | 'DASHBOARD' | 'ADMIN') => void;
+  currentPath: string;
+  navigate: (path: string) => void;
   openSubmitModal: () => void;
   openAuthModal: (mode?: 'LOGIN' | 'SIGNUP') => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, openSubmitModal, openAuthModal }) => {
-  const { currentUser, role, setRole, logoutUser, availableBalance } = useApp();
-  
-  // Admin Security Pin Modal State
-  const [isAdminPinModalOpen, setIsAdminPinModalOpen] = useState(false);
-  const [adminPinInput, setAdminPinInput] = useState('');
-  const [pinError, setPinError] = useState(false);
-
-  const handleAdminToggle = () => {
-    if (role === 'SELLER') {
-      // Prompt passcode to enter admin
-      setIsAdminPinModalOpen(true);
-    } else {
-      setRole('SELLER');
-      setActiveTab('SELL');
-    }
-  };
-
-  const handleAdminPinSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (adminPinInput === 'admin123' || adminPinInput === '1234') {
-      setRole('ADMIN');
-      setActiveTab('ADMIN');
-      setIsAdminPinModalOpen(false);
-      setAdminPinInput('');
-      setPinError(false);
-    } else {
-      setPinError(true);
-    }
-  };
+export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate, openSubmitModal, openAuthModal }) => {
+  const { currentUser, logoutUser, availableBalance } = useApp();
 
   return (
     <>
@@ -47,7 +19,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, openSub
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           
           {/* Brand Logo */}
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab('SELL')}>
+          <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
             <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-brand-600 via-brand-500 to-accent-cyan p-0.5 shadow-lg shadow-brand-500/20">
               <div className="w-full h-full bg-dark-card rounded-[10px] flex items-center justify-center">
                 <Mail className="w-5 h-5 sm:w-6 sm:h-6 text-brand-400" />
@@ -66,50 +38,37 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, openSub
             </div>
           </div>
 
-          {/* Center Nav Links (Desktop) */}
+          {/* Center Nav Links (Desktop) - Separated Seller Route /seller */}
           <nav className="hidden md:flex items-center gap-1 bg-dark-card/80 p-1.5 rounded-xl border border-dark-border">
             <button
-              onClick={() => setActiveTab('SELL')}
+              onClick={() => navigate('/')}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                activeTab === 'SELL'
+                currentPath === '/' || currentPath === ''
                   ? 'bg-brand-500 text-white shadow-md shadow-brand-500/25'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-dark-hover'
               }`}
             >
-              Sell Rates & Calculator
+              Buying Rates & Calculator
             </button>
             
             <button
-              onClick={() => setActiveTab('DASHBOARD')}
+              onClick={() => navigate('/seller')}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
-                activeTab === 'DASHBOARD'
+                currentPath === '/seller' || currentPath === '/dashboard'
                   ? 'bg-brand-500 text-white shadow-md shadow-brand-500/25'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-dark-hover'
               }`}
             >
-              Seller Dashboard
+              <LayoutDashboard className="w-4 h-4" />
+              <span>Seller Portal (/seller)</span>
             </button>
-
-            {role === 'ADMIN' && (
-              <button
-                onClick={() => setActiveTab('ADMIN')}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
-                  activeTab === 'ADMIN'
-                    ? 'bg-accent-violet text-white shadow-md shadow-accent-violet/25'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-dark-hover'
-                }`}
-              >
-                <Shield className="w-4 h-4 text-amber-400" />
-                Admin Control Vault
-              </button>
-            )}
           </nav>
 
           {/* Right Action Controls */}
           <div className="flex items-center gap-2 sm:gap-3">
             
             {/* Seller Balance Pill */}
-            {role === 'SELLER' && currentUser && (
+            {currentUser && currentPath !== '/admin' && (
               <div className="flex items-center gap-1.5 bg-dark-card px-2.5 sm:px-3.5 py-1.5 rounded-xl border border-dark-border text-xs">
                 <Wallet className="w-4 h-4 text-brand-400" />
                 <div>
@@ -120,7 +79,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, openSub
             )}
 
             {/* Sell Button CTA */}
-            {role === 'SELLER' && (
+            {currentPath !== '/admin' && (
               <button
                 onClick={openSubmitModal}
                 className="hidden sm:flex bg-gradient-to-r from-brand-500 to-accent-cyan text-slate-950 font-bold px-4 py-2 rounded-xl text-sm hover:brightness-110 transition-all shadow-lg shadow-brand-500/20 items-center gap-2 cursor-pointer"
@@ -155,22 +114,6 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, openSub
               </button>
             )}
 
-            {/* Admin / Seller Mode Switcher Toggle */}
-            <div className="pl-1 sm:pl-2 border-l border-dark-border">
-              <button
-                onClick={handleAdminToggle}
-                title="Click to toggle between Seller and Admin Panel view"
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold border transition-all cursor-pointer ${
-                  role === 'ADMIN'
-                    ? 'bg-accent-purple/20 text-accent-purple border-accent-purple/40 hover:bg-accent-purple/30'
-                    : 'bg-dark-card text-slate-300 border-dark-border hover:bg-dark-hover'
-                }`}
-              >
-                <ArrowRightLeft className="w-3.5 h-3.5" />
-                <span className="hidden xs:inline">View:</span> <strong>{role}</strong>
-              </button>
-            </div>
-
           </div>
 
         </div>
@@ -181,27 +124,17 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, openSub
         <div className="flex items-center justify-around">
           
           <button
-            onClick={() => setActiveTab('SELL')}
+            onClick={() => navigate('/')}
             className={`flex flex-col items-center gap-1 text-[10px] font-medium transition-all ${
-              activeTab === 'SELL' ? 'text-brand-400 font-bold' : 'text-slate-400'
+              currentPath === '/' || currentPath === '' ? 'text-brand-400 font-bold' : 'text-slate-400'
             }`}
           >
             <Home className="w-5 h-5" />
             <span>Rates</span>
           </button>
 
-          <button
-            onClick={() => setActiveTab('DASHBOARD')}
-            className={`flex flex-col items-center gap-1 text-[10px] font-medium transition-all ${
-              activeTab === 'DASHBOARD' ? 'text-brand-400 font-bold' : 'text-slate-400'
-            }`}
-          >
-            <LayoutDashboard className="w-5 h-5" />
-            <span>Dashboard</span>
-          </button>
-
           {/* Floating Sell CTA */}
-          {role === 'SELLER' && (
+          {currentPath !== '/admin' && (
             <button
               onClick={openSubmitModal}
               className="bg-gradient-to-r from-brand-500 to-accent-cyan text-slate-950 p-3 rounded-full shadow-lg shadow-brand-500/30 -mt-6 border-2 border-[#070A12]"
@@ -210,66 +143,18 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, openSub
             </button>
           )}
 
-          {role === 'ADMIN' && (
-            <button
-              onClick={() => setActiveTab('ADMIN')}
-              className={`flex flex-col items-center gap-1 text-[10px] font-medium transition-all ${
-                activeTab === 'ADMIN' ? 'text-accent-purple font-bold' : 'text-slate-400'
-              }`}
-            >
-              <Shield className="w-5 h-5" />
-              <span>Admin</span>
-            </button>
-          )}
+          <button
+            onClick={() => navigate('/seller')}
+            className={`flex flex-col items-center gap-1 text-[10px] font-medium transition-all ${
+              currentPath === '/seller' || currentPath === '/dashboard' ? 'text-brand-400 font-bold' : 'text-slate-400'
+            }`}
+          >
+            <LayoutDashboard className="w-5 h-5" />
+            <span>Seller Portal</span>
+          </button>
 
         </div>
       </div>
-
-      {/* Admin Passcode Lock Modal Popup */}
-      {isAdminPinModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm">
-          <div className="glass-card w-full max-w-sm rounded-3xl border border-accent-purple/40 p-6 shadow-2xl bg-dark-card text-center">
-            <div className="w-12 h-12 rounded-2xl bg-accent-purple/20 border border-accent-purple/40 flex items-center justify-center text-accent-purple mx-auto mb-4">
-              <Lock className="w-6 h-6" />
-            </div>
-
-            <h3 className="font-bold text-lg text-white">Admin Vault Authentication</h3>
-            <p className="text-xs text-slate-400 mt-1 mb-4">Enter secret admin passcode to unlock admin vault controls.</p>
-
-            {pinError && (
-              <div className="bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold p-2.5 rounded-xl mb-4">
-                Incorrect passcode! Default passcode is <strong>admin123</strong>
-              </div>
-            )}
-
-            <form onSubmit={handleAdminPinSubmit} className="space-y-4">
-              <input
-                type="password"
-                placeholder="Passcode (Default: admin123)"
-                value={adminPinInput}
-                onChange={(e) => { setAdminPinInput(e.target.value); setPinError(false); }}
-                className="w-full bg-dark-bg border border-dark-border rounded-xl px-4 py-3 text-sm text-center text-white font-mono focus:outline-none focus:border-accent-purple"
-              />
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsAdminPinModalOpen(false)}
-                  className="w-1/2 py-2.5 rounded-xl text-xs font-semibold text-slate-400 bg-dark-panel hover:bg-dark-hover"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="w-1/2 py-2.5 rounded-xl text-xs font-bold bg-accent-purple hover:bg-purple-600 text-white shadow-lg shadow-purple-500/20"
-                >
-                  Unlock Vault
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </>
   );
 };

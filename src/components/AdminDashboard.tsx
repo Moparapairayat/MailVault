@@ -9,13 +9,19 @@ export const AdminDashboard: React.FC = () => {
     categories,
     submissions,
     withdrawals,
+    announcements,
     updateCategoryRate,
     toggleCategoryStatus,
     reviewSubmission,
     reviewBatchSubmissions,
     processWithdrawal,
-    exportApprovedEmails
+    exportApprovedEmails,
+    addAnnouncement,
+    deleteAnnouncement
   } = useApp();
+
+  const [newNoticeInput, setNewNoticeInput] = useState('');
+  const [newNoticeType, setNewNoticeType] = useState<'INFO' | 'BONUS' | 'WARNING'>('BONUS');
 
   // Telegram Config
   const [tgConfig, setTgConfig] = useState<TelegramConfig>(getTelegramConfig());
@@ -489,6 +495,81 @@ export const AdminDashboard: React.FC = () => {
             </button>
           </div>
         </form>
+      </div>
+
+      {/* Dynamic Admin Announcement Notice Board Manager Card */}
+      <div className="glass-card p-6 rounded-2xl border border-dark-border mb-10 bg-gradient-to-r from-dark-card via-dark-panel to-dark-card">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
+            <Bell className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-white">Dynamic Notice & Announcement Manager</h3>
+            <p className="text-xs text-slate-400">Publish live news, bonus updates or system notices to all sellers in real-time.</p>
+          </div>
+        </div>
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (newNoticeInput.trim()) {
+              addAnnouncement(newNoticeInput, newNoticeType);
+              setNewNoticeInput('');
+            }
+          }}
+          className="flex flex-col sm:flex-row items-center gap-3 mb-6"
+        >
+          <input
+            type="text"
+            placeholder="e.g. 🔥 Special Offer: Gmail Old rate increased to ৳20/pc today!"
+            value={newNoticeInput}
+            onChange={(e) => setNewNoticeInput(e.target.value)}
+            className="w-full bg-dark-bg border border-dark-border rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500"
+          />
+
+          <select
+            value={newNoticeType}
+            onChange={(e) => setNewNoticeType(e.target.value as any)}
+            className="bg-dark-bg border border-dark-border rounded-xl px-3 py-2.5 text-xs text-white font-semibold focus:outline-none shrink-0"
+          >
+            <option value="BONUS">Bonus / Rate Offer</option>
+            <option value="INFO">General Info</option>
+            <option value="WARNING">Important Warning</option>
+          </select>
+
+          <button
+            type="submit"
+            className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs transition-all shadow-md shrink-0 cursor-pointer"
+          >
+            Post Notice
+          </button>
+        </form>
+
+        {/* Existing Notices List */}
+        <div className="space-y-2">
+          {announcements.map((n) => (
+            <div key={n.id} className="bg-dark-bg p-3 rounded-xl border border-dark-border flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2">
+                <span className={`px-2 py-0.5 text-[9px] font-bold rounded ${
+                  n.type === 'BONUS' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+                  n.type === 'WARNING' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-accent-cyan/20 text-accent-cyan border border-accent-cyan/30'
+                }`}>
+                  {n.type}
+                </span>
+                <span className="text-slate-200">{n.text}</span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => deleteAnnouncement(n.id)}
+                className="text-slate-500 hover:text-rose-400 p-1"
+                title="Delete Notice"
+              >
+                <XCircle className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Main Email Submissions Review Vault */}

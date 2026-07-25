@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { EmailCategory, EmailItem, WithdrawalRequest, UserRole, CategoryId, PaymentMethod, SubmissionStatus, UserProfile } from '../types';
+import { EmailCategory, EmailItem, WithdrawalRequest, UserRole, CategoryId, PaymentMethod, SubmissionStatus, UserProfile, AnnouncementNotice } from '../types';
 import { INITIAL_CATEGORIES, INITIAL_SUBMISSIONS, INITIAL_WITHDRAWALS } from '../mockData';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { sendTelegramAlert } from '../lib/telegram';
@@ -12,6 +12,7 @@ interface AppContextType {
   categories: EmailCategory[];
   submissions: EmailItem[];
   withdrawals: WithdrawalRequest[];
+  announcements: AnnouncementNotice[];
   
   // Auth Actions
   loginUser: (email: string, pass: string) => Promise<{ success: boolean; message: string }>;
@@ -30,12 +31,16 @@ interface AppContextType {
   processWithdrawal: (withdrawalId: string, status: 'COMPLETED' | 'REJECTED', txId?: string) => Promise<void>;
   exportApprovedEmails: (categoryId?: CategoryId) => void;
   
+  // Announcement Actions
+  addAnnouncement: (text: string, type: 'INFO' | 'BONUS' | 'WARNING') => void;
+  deleteAnnouncement: (id: string) => void;
+  
   // Calculated Stats
   availableBalance: number;
   pendingBalance: number;
   totalWithdrawn: number;
+  referralEarnings: number;
   totalEmailsBought: number;
-  activeAnnouncements: string[];
   isSupabaseLive: boolean;
 }
 
@@ -45,8 +50,17 @@ const DEFAULT_DEMO_USER: UserProfile = {
   email: 'karim@seller.com',
   phone: '01711223344',
   role: 'SELLER',
+  refCode: 'karim88',
+  referralEarnings: 150,
+  totalReferredCount: 4,
   createdAt: new Date().toISOString()
 };
+
+const INITIAL_NOTICES: AnnouncementNotice[] = [
+  { id: 'not-1', text: '🔥 Gmail Old (2018-2022) Buying Rate increased to ৳18/pc!', type: 'BONUS', active: true, createdAt: new Date().toISOString() },
+  { id: 'not-2', text: '⚡ Instant payouts via bKash & Nagad within 30 minutes.', type: 'INFO', active: true, createdAt: new Date().toISOString() },
+  { id: 'not-3', text: '🎉 Share your Referral Link to earn 3% lifetime commission on invited sellers!', type: 'BONUS', active: true, createdAt: new Date().toISOString() }
+];
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
@@ -59,6 +73,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Role
   const [role, setRole] = useState<UserRole>('SELLER');
+
+  // Announcements
+  const [announcements, setAnnouncements] = useState<AnnouncementNotice[]>(() => {
+    const saved = localStorage.getItem('mailvault_announcements');
+    return saved ? JSON.parse(saved) : INITIAL_NOTICES;
+  });
 
   // Categories
   const [categories, setCategories] = useState<EmailCategory[]>(() => {
@@ -78,6 +98,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : INITIAL_WITHDRAWALS;
   });
 
+  // Track Referral Code from URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get('ref');
+    if (ref) {
+      localStorage.setItem('mailvault_ref_code', ref);
+    }
+  }, []);
+
   // Local Storage Save
   useEffect(() => {
     if (currentUser) {
@@ -86,6 +115,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       localStorage.removeItem('mailvault_current_user');
     }
   }, [currentUser]);
+
+  useEffect(() => {
+    localStorage.setItem('mailvault_announcements', JSON.stringify(announcements));
+  }, [announcements]);
 
   // Fetch initial data & subscribe to Supabase Realtime if configured
   useEffect(() => {
@@ -176,12 +209,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const loginUser = async (email: string, pass: string) => {
     if (!email || !pass) return { success: false, message: 'Please enter email and password.' };
 
+    const username = email.split('@')[0];
     const newUser: UserProfile = {
-      id: `usr-${email.split('@')[0]}`,
-      name: email.split('@')[0].toUpperCase(),
+      id: `usr-${username}`,
+      name: username.toUpperCase(),
       email,
       phone: '01700000000',
       role: 'SELLER',
+      refCode: `${username}${Math.floor(10 + Math.random() * 89)}`,
+      referralEarnings: 0,
+      totalReferredCount: 0,
       createdAt: new Date().toISOString()
     };
 
@@ -194,12 +231,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, message: 'Please fill all required fields.' };
     }
 
+    const savedRefCode = localStorage.getItem('mailvault_ref_code') || undefined;
+
     const newUser: UserProfile = {
       id: `usr-${Date.now()}`,
       name,
       email,
       phone,
       role: 'SELLER',
+      refCode: `${name.toLowerCase().replace(/\s+/g, '')}${Math.floor(10 + Math.random() * 89)}`,
+      referredBy: savedRefCode,
+      referralEarnings: 0,
+      totalReferredCount: 0,
       createdAt: new Date().toISOString()
     };
 
@@ -220,7 +263,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const approvedItems = mySubmissions.filter(s => s.status === 'APPROVED');
   const pendingItems = mySubmissions.filter(s => s.status === 'PENDING');
   
-  const totalApprovedEarnings = approvedItems.reduce((acc, curr) => acc + curr.rate, 0);
+  const referralBonus = currentUser ? (currentUser.referralEarnings || 0) : 150;
+  const totalApprovedEarnings = approvedItems.reduce((acc, curr) => acc + curr.rate, 0) + referralBonus;
   const pendingBalance = pendingItems.reduce((acc, curr) => acc + curr.rate, 0);
 
   const completedWithdrawals = myWithdrawals.filter(w => w.status === 'COMPLETED' || w.status === 'PENDING');
@@ -229,6 +273,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const availableBalance = Math.max(0, totalApprovedEarnings - pendingOrDoneWithdrawn);
   const totalEmailsBought = approvedItems.length;
+
+  // Announcement Actions
+  const addAnnouncement = (text: string, type: 'INFO' | 'BONUS' | 'WARNING') => {
+    if (!text.trim()) return;
+    const newNotice: AnnouncementNotice = {
+      id: `not-${Date.now()}`,
+      text: text.trim(),
+      type,
+      active: true,
+      createdAt: new Date().toISOString()
+    };
+    setAnnouncements(prev => [newNotice, ...prev]);
+  };
+
+  const deleteAnnouncement = (id: string) => {
+    setAnnouncements(prev => prev.filter(n => n.id !== id));
+  };
 
   // Submit Batch Emails
   const submitBatchEmails = async (categoryId: CategoryId, rawText: string) => {
@@ -463,12 +524,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     URL.revokeObjectURL(url);
   };
 
-  const activeAnnouncements = [
-    "🔥 Gmail Old (2018-2022) Buying Rate increased to ৳18/pc!",
-    "⚡ Instant payouts via bKash & Nagad within 30 minutes.",
-    "🛡️ 100% Secure Procurement System - Only Admin buys your emails."
-  ];
-
   return (
     <AppContext.Provider
       value={{
@@ -478,6 +533,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         categories,
         submissions,
         withdrawals,
+        announcements,
         loginUser,
         registerUser,
         logoutUser,
@@ -489,11 +545,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         reviewBatchSubmissions,
         processWithdrawal,
         exportApprovedEmails,
+        addAnnouncement,
+        deleteAnnouncement,
         availableBalance,
         pendingBalance,
         totalWithdrawn,
+        referralEarnings: referralBonus,
         totalEmailsBought,
-        activeAnnouncements,
         isSupabaseLive: isSupabaseConfigured
       }}
     >

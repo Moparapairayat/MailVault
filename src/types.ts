@@ -63,6 +63,7 @@ export interface SellerWallet {
   availableBalance: number;
   pendingBalance: number;
   totalWithdrawn: number;
+  referralEarnings: number;
 }
 
 export type UserRole = 'SELLER' | 'ADMIN';
@@ -73,5 +74,17 @@ export interface UserProfile {
   email: string;
   phone: string;
   role: UserRole;
+  refCode: string;
+  referredBy?: string;
+  referralEarnings: number;
+  totalReferredCount: number;
+  createdAt: string;
+}
+
+export interface AnnouncementNotice {
+  id: string;
+  text: string;
+  type: 'INFO' | 'BONUS' | 'WARNING';
+  active: boolean;
   createdAt: string;
 }

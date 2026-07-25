@@ -1,26 +1,34 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { PaymentMethod } from '../types';
-import { Wallet, ArrowDownRight, Clock, CheckCircle2, XCircle, Search, Copy, Check, Sparkles, DollarSign, CreditCard } from 'lucide-react';
+import { PaymentMethod, CategoryId } from '../types';
+import { Wallet, ArrowDownRight, Clock, CheckCircle2, XCircle, Search, Copy, Check, Sparkles, DollarSign, CreditCard, Award, UploadCloud, Share2, MessageSquare, Send, ShieldCheck, Zap, Layers, FileText } from 'lucide-react';
 
 interface SellerDashboardProps {
-  openSubmitModal: () => void;
+  openSubmitModal: (categoryId?: CategoryId) => void;
 }
 
 export const SellerDashboard: React.FC<SellerDashboardProps> = ({ openSubmitModal }) => {
   const {
+    currentUser,
     availableBalance,
     pendingBalance,
     totalWithdrawn,
+    referralEarnings,
     submissions,
     withdrawals,
     categories,
-    requestWithdrawal
+    requestWithdrawal,
+    submitBatchEmails
   } = useApp();
 
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [copiedRef, setCopiedRef] = useState<boolean>(false);
+
+  // File Drag & Drop State
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [fileNotice, setFileNotice] = useState<string | null>(null);
 
   // Withdraw Modal State
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
@@ -30,17 +38,65 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({ openSubmitModa
   const [withdrawNotice, setWithdrawNotice] = useState<{ success: boolean; text: string } | null>(null);
 
   // Filter Submissions for current seller
-  const mySubmissions = submissions.filter(s => s.sellerId === 'usr-seller-1');
+  const sellerId = currentUser ? currentUser.id : 'usr-seller-1';
+  const mySubmissions = submissions.filter(s => s.sellerId === sellerId);
   const filteredSubmissions = mySubmissions.filter(s => {
     const matchesStatus = filterStatus === 'ALL' || s.status === filterStatus;
     const matchesSearch = s.email.toLowerCase().includes(searchQuery.toLowerCase()) || s.batchId.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesStatus && matchesSearch;
   });
 
+  const totalApprovedCount = mySubmissions.filter(s => s.status === 'APPROVED').length;
+
+  // Gamified Seller Tier Logic
+  const getSellerTier = (count: number) => {
+    if (count >= 500) {
+      return { title: 'Gold VIP Seller', badge: '🥇 Gold VIP', color: 'text-amber-400 bg-amber-500/10 border-amber-500/30', perk: '+৳1.0/pc Extra Bonus & 10-Min Payouts' };
+    } else if (count >= 50) {
+      return { title: 'Silver Seller', badge: '🥈 Silver', color: 'text-slate-300 bg-slate-400/10 border-slate-400/30', perk: '+৳0.5/pc Extra Bonus & Priority Review' };
+    }
+    return { title: 'Bronze Seller', badge: '🥉 Bronze', color: 'text-orange-400 bg-orange-500/10 border-orange-500/30', perk: 'Standard Instant Procurement' };
+  };
+
+  const sellerTier = getSellerTier(totalApprovedCount);
+  const refCode = currentUser?.refCode || 'karim88';
+  const refLink = `${window.location.origin}/?ref=${refCode}`;
+
   const handleCopy = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleCopyRef = () => {
+    navigator.clipboard.writeText(refLink);
+    setCopiedRef(true);
+    setTimeout(() => setCopiedRef(false), 2000);
+  };
+
+  // Drag & Drop File Parsing
+  const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      const file = files[0];
+      if (!file.name.endsWith('.txt') && !file.name.endsWith('.csv')) {
+        setFileNotice('Please upload a valid .TXT or .CSV email list file.');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = async (evt) => {
+        const text = evt.target?.result as string;
+        if (text) {
+          const res = await submitBatchEmails('gmail_fresh', text);
+          setFileNotice(res.message);
+        }
+      };
+      reader.readAsText(file);
+    }
   };
 
   const handleWithdrawSubmit = async (e: React.FormEvent) => {
@@ -61,97 +117,224 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({ openSubmitModa
 
   const getCategoryName = (id: string) => categories.find(c => c.id === id)?.name || id;
 
+  // Social Share helpers
+  const shareText = encodeURIComponent(`Sell your verified Gmails & Edu Mails directly to MailVault for instant bKash/Nagad payouts! Join via my link: ${refLink}`);
+  const whatsappUrl = `https://api.whatsapp.com/send?text=${shareText}`;
+  const telegramUrl = `https://t.me/share/url?url=${encodeURIComponent(refLink)}&text=${shareText}`;
+  const facebookUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(refLink)}`;
+
   return (
     <div className="py-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       
-      {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-3xl font-extrabold text-white">Seller Dashboard & Wallet</h1>
-          <p className="text-sm text-slate-400">Track your submitted emails, live approval status, and payout history.</p>
+      {/* Top Header with Seller Profile & Tier Badge */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 bg-gradient-to-r from-dark-card via-dark-panel to-dark-card p-6 rounded-3xl border border-brand-500/30">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-brand-500/20 border border-brand-500/40 flex items-center justify-center text-brand-400 font-extrabold text-xl shadow-lg shadow-brand-500/10">
+            {currentUser ? currentUser.name.charAt(0).toUpperCase() : 'K'}
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-black text-white">{currentUser ? currentUser.name : 'Karim Ahmed'}</h1>
+              <span className={`px-2.5 py-0.5 text-[10px] font-extrabold uppercase border rounded-full ${sellerTier.color}`}>
+                {sellerTier.badge}
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 mt-0.5 font-medium">
+              Phone: <span className="text-slate-200 font-mono">{currentUser ? currentUser.phone : '01711223344'}</span> • Perk: <strong className="text-emerald-400">{sellerTier.perk}</strong>
+            </p>
+          </div>
         </div>
 
         <button
-          onClick={openSubmitModal}
-          className="bg-gradient-to-r from-brand-500 to-accent-cyan text-slate-950 font-bold px-6 py-3 rounded-xl text-sm transition-all shadow-lg shadow-brand-500/20 flex items-center gap-2 self-start md:self-auto"
+          onClick={() => openSubmitModal()}
+          className="bg-gradient-to-r from-brand-500 to-accent-cyan text-slate-950 font-extrabold px-6 py-3.5 rounded-2xl text-xs transition-all shadow-xl shadow-brand-500/25 hover:brightness-110 flex items-center gap-2 self-start md:self-auto cursor-pointer"
         >
           <Sparkles className="w-4 h-4" />
-          <span>Submit New Batch Emails</span>
+          <span>Submit Bulk Mails</span>
         </button>
       </div>
 
-      {/* Wallet Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+      {/* FinTech Glowing Balance Cards Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
         
-        {/* Available Balance Card */}
-        <div className="glass-card p-6 rounded-2xl border border-brand-500/40 relative overflow-hidden bg-gradient-to-br from-dark-card via-dark-panel to-dark-card shadow-xl">
+        {/* Available Balance Card (Emerald Glow) */}
+        <div className="glass-card p-6 rounded-2xl border border-emerald-500/40 relative overflow-hidden bg-gradient-to-br from-dark-card via-dark-panel to-dark-card shadow-xl group hover:border-emerald-500/60 transition-all">
           <div className="flex items-center justify-between mb-4">
-            <div className="w-10 h-10 rounded-xl bg-brand-500/20 border border-brand-500/30 flex items-center justify-center text-brand-400">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
               <Wallet className="w-5 h-5" />
             </div>
-            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-brand-500/10 text-brand-400 border border-brand-500/20">
-              Ready to Withdraw
+            <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              Ready Cash
             </span>
           </div>
 
-          <div className="text-xs text-slate-400 font-medium">Available Wallet Balance</div>
+          <div className="text-xs text-slate-400 font-medium">Available Balance</div>
           <div className="text-3xl font-black text-white mt-1">৳{availableBalance.toLocaleString()}</div>
 
-          <div className="mt-6 flex items-center gap-2">
-            <button
-              onClick={() => {
-                setWithdrawAmount(availableBalance);
-                setIsWithdrawOpen(true);
-              }}
-              disabled={availableBalance < 100}
-              className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 ${
-                availableBalance >= 100
-                  ? 'bg-brand-500 hover:bg-brand-600 text-white shadow-md shadow-brand-500/20'
-                  : 'bg-dark-hover text-slate-500 cursor-not-allowed border border-dark-border'
-              }`}
-            >
-              <ArrowDownRight className="w-4 h-4" />
-              <span>Withdraw Cash (Min ৳100)</span>
-            </button>
-          </div>
+          <button
+            onClick={() => {
+              setWithdrawAmount(availableBalance);
+              setIsWithdrawOpen(true);
+            }}
+            disabled={availableBalance < 100}
+            className={`w-full mt-5 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 ${
+              availableBalance >= 100
+                ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-md shadow-emerald-500/20 cursor-pointer'
+                : 'bg-dark-hover text-slate-500 cursor-not-allowed border border-dark-border'
+            }`}
+          >
+            <ArrowDownRight className="w-4 h-4" />
+            <span>Withdraw Cash</span>
+          </button>
         </div>
 
-        {/* Pending Verification Card */}
-        <div className="glass-card p-6 rounded-2xl border border-dark-border relative overflow-hidden">
+        {/* Pending Verification Card (Amber Glow) */}
+        <div className="glass-card p-6 rounded-2xl border border-amber-500/30 relative overflow-hidden group hover:border-amber-500/50 transition-all">
           <div className="flex items-center justify-between mb-4">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
               <Clock className="w-5 h-5" />
             </div>
-            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+            <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
               In Review
             </span>
           </div>
 
           <div className="text-xs text-slate-400 font-medium">Pending Verification</div>
           <div className="text-3xl font-black text-amber-400 mt-1">৳{pendingBalance.toLocaleString()}</div>
-          <p className="text-xs text-slate-400 mt-6">
-            Admin verifies submitted emails within 15-30 minutes.
+          <p className="text-[11px] text-slate-400 mt-5 leading-tight">
+            Verification speed: <strong>15-30 mins</strong>
           </p>
         </div>
 
-        {/* Total Withdrawn Card */}
-        <div className="glass-card p-6 rounded-2xl border border-dark-border relative overflow-hidden">
+        {/* Total Paid Out Card (Cyan Glow) */}
+        <div className="glass-card p-6 rounded-2xl border border-accent-cyan/30 relative overflow-hidden group hover:border-accent-cyan/50 transition-all">
           <div className="flex items-center justify-between mb-4">
-            <div className="w-10 h-10 rounded-xl bg-accent-cyan/20 border border-accent-cyan/30 flex items-center justify-center text-accent-cyan">
+            <div className="w-10 h-10 rounded-xl bg-accent-cyan/20 border border-accent-cyan/40 flex items-center justify-center text-accent-cyan">
               <CheckCircle2 className="w-5 h-5" />
             </div>
-            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-accent-cyan/10 text-accent-cyan border border-accent-cyan/20">
-              Completed
+            <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-accent-cyan/10 text-accent-cyan border border-accent-cyan/20">
+              Paid Out
             </span>
           </div>
 
-          <div className="text-xs text-slate-400 font-medium">Total Paid Out</div>
+          <div className="text-xs text-slate-400 font-medium">Total Cash Paid</div>
           <div className="text-3xl font-black text-white mt-1">৳{totalWithdrawn.toLocaleString()}</div>
-          <p className="text-xs text-slate-400 mt-6">
-            Successfully received via bKash / Nagad / Rocket.
+          <p className="text-[11px] text-slate-400 mt-5 leading-tight">
+            Via bKash / Nagad / Rocket
           </p>
         </div>
 
+        {/* Referral Bonus Earnings Card (Purple Glow) */}
+        <div className="glass-card p-6 rounded-2xl border border-purple-500/30 relative overflow-hidden group hover:border-purple-500/50 transition-all">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-400">
+              <Award className="w-5 h-5" />
+            </div>
+            <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20">
+              3% Commission
+            </span>
+          </div>
+
+          <div className="text-xs text-slate-400 font-medium">Referral Earnings</div>
+          <div className="text-3xl font-black text-purple-400 mt-1">৳{referralEarnings.toLocaleString()}</div>
+          <p className="text-[11px] text-slate-400 mt-5 leading-tight">
+            Referred Sellers: <strong>{currentUser?.totalReferredCount || 4} Members</strong>
+          </p>
+        </div>
+
+      </div>
+
+      {/* Drag & Drop File Upload Zone Card */}
+      <div
+        onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+        onDragLeave={() => setIsDragging(false)}
+        onDrop={handleFileDrop}
+        className={`glass-card p-8 rounded-3xl border-2 border-dashed transition-all mb-10 text-center ${
+          isDragging
+            ? 'border-brand-500 bg-brand-500/10 scale-[1.01]'
+            : 'border-dark-border hover:border-brand-500/40 bg-dark-card/60'
+        }`}
+      >
+        <div className="w-14 h-14 rounded-2xl bg-brand-500/10 border border-brand-500/30 flex items-center justify-center text-brand-400 mx-auto mb-3">
+          <UploadCloud className="w-7 h-7" />
+        </div>
+        <h3 className="text-lg font-bold text-white">Drag & Drop Your Bulk Email File (.TXT / .CSV)</h3>
+        <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+          Drop your email text file directly here for instant auto-parsing in <code>email:password:recovery</code> format.
+        </p>
+
+        {fileNotice && (
+          <div className="mt-4 inline-block bg-brand-500/10 border border-brand-500/30 text-brand-400 text-xs font-semibold px-4 py-2 rounded-xl">
+            {fileNotice}
+          </div>
+        )}
+      </div>
+
+      {/* One-Click Social Referral Sharing Card */}
+      <div className="glass-card p-6 rounded-2xl border border-brand-500/30 mb-10 bg-gradient-to-r from-dark-card via-dark-panel to-dark-card shadow-xl">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-0.5 text-[10px] font-bold uppercase bg-brand-500/10 text-brand-400 border border-brand-500/30 rounded-full">
+                3% Lifetime Bonus Commission
+              </span>
+            </div>
+            <h3 className="text-xl font-extrabold text-white">Invite Sellers & Earn Passive Cash</h3>
+            <p className="text-xs text-slate-400 max-w-xl">
+              Share your personal referral link with friends or Facebook groups. Whenever your referred friends sell emails to MailVault, you automatically receive 3% bonus cash in your wallet!
+            </p>
+          </div>
+
+          <div className="bg-dark-bg p-4 rounded-2xl border border-dark-border space-y-3 shrink-0">
+            <div>
+              <span className="text-[10px] text-slate-400 block font-medium">Your Unique Referral Link</span>
+              <div className="font-mono text-xs text-brand-400 font-bold max-w-[260px] truncate">
+                {refLink}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                onClick={handleCopyRef}
+                className="bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition-all shadow-md flex items-center gap-1.5 shrink-0"
+              >
+                {copiedRef ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copiedRef ? 'Copied' : 'Copy'}</span>
+              </button>
+
+              {/* Social Share Buttons */}
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5"
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                <span>WhatsApp</span>
+              </a>
+
+              <a
+                href={telegramUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="bg-sky-600/20 hover:bg-sky-600/30 text-sky-400 border border-sky-500/30 px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>Telegram</span>
+              </a>
+
+              <a
+                href={facebookUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5"
+              >
+                <Share2 className="w-3.5 h-3.5" />
+                <span>Share</span>
+              </a>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Email Submissions History Section */}
@@ -165,8 +348,6 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({ openSubmitModa
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            
-            {/* Search Input */}
             <div className="relative">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
@@ -178,7 +359,6 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({ openSubmitModa
               />
             </div>
 
-            {/* Filter Tabs */}
             <div className="flex bg-dark-bg p-1 rounded-xl border border-dark-border">
               {(['ALL', 'PENDING', 'APPROVED', 'REJECTED'] as const).map(status => (
                 <button
@@ -194,7 +374,6 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({ openSubmitModa
                 </button>
               ))}
             </div>
-
           </div>
         </div>
 

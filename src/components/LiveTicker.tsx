@@ -3,14 +3,16 @@ import { useApp } from '../context/AppContext';
 import { TrendingUp, ShieldCheck, Zap } from 'lucide-react';
 
 export const LiveTicker: React.FC = () => {
-  const { categories } = useApp();
+  const { categories, announcements } = useApp();
+
+  const customNoticeItems = announcements.filter(a => a.active).map(a => a.text);
 
   const tickerItems = [
+    ...customNoticeItems,
     ...categories.map(c => `🔥 ${c.name}: ৳${c.ratePerUnit}/pc (${c.status})`),
     "⚡ Fast Payout via bKash, Nagad & Rocket within 30 min",
     "🛡️ 100% Direct Procurement - No middleman commission",
     "🎉 Recent Payout: Seller Karim A. withdrew ৳500 via bKash",
-    "🎉 Recent Payout: Seller Rahim C. withdrew ৳1,450 via Nagad",
   ];
 
   return (
