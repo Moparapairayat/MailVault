@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { EmailCategory, EmailItem, WithdrawalRequest, UserRole, CategoryId, PaymentMethod, SubmissionStatus, UserProfile, AnnouncementNotice, PayoutMethodConfig } from '../types';
-import { INITIAL_CATEGORIES, INITIAL_SUBMISSIONS, INITIAL_WITHDRAWALS } from '../mockData';
+import { INITIAL_CATEGORIES } from '../mockData';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { sendTelegramAlert } from '../lib/telegram';
 import { playCashSound, playSuccessSound } from '../utils/audio';
@@ -56,31 +56,15 @@ interface AppContextType {
   isSupabaseLive: boolean;
 }
 
-const DEFAULT_DEMO_USER: UserProfile = {
-  id: 'usr-seller-1',
-  name: 'Karim Ahmed',
-  email: 'karim@seller.com',
-  phone: '01711223344',
-  role: 'SELLER',
-  refCode: 'karim88',
-  referralEarnings: 150,
-  totalReferredCount: 4,
-  createdAt: new Date().toISOString()
-};
 
-const INITIAL_NOTICES: AnnouncementNotice[] = [
-  { id: 'not-1', text: '🔥 Gmail Old (2018-2022) Buying Rate increased to ৳18/pc!', type: 'BONUS', active: true, createdAt: new Date().toISOString() },
-  { id: 'not-2', text: '⚡ Instant payouts via bKash & Nagad within 30 minutes.', type: 'INFO', active: true, createdAt: new Date().toISOString() },
-  { id: 'not-3', text: '🎉 Share your Referral Link to earn 3% lifetime commission on invited sellers!', type: 'BONUS', active: true, createdAt: new Date().toISOString() }
-];
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Current User Session
+  // Current User Session — null by default, requires real login
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
     const saved = localStorage.getItem('mailvault_current_user');
-    return saved ? JSON.parse(saved) : DEFAULT_DEMO_USER;
+    return saved ? JSON.parse(saved) : null;
   });
 
   // Role
@@ -135,14 +119,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('mailvault_payout_methods', JSON.stringify(updated));
   };
 
-  // Announcements
-  const [announcements, setAnnouncements] = useState<AnnouncementNotice[]>(() => {
-    const saved = localStorage.getItem('mailvault_announcements');
-    return saved ? JSON.parse(saved) : [
-      { id: '1', text: '🔥 High Demand Offer: Fresh Gmail buying rate increased to ৳18/pc today!', type: 'BONUS', active: true, createdAt: new Date().toISOString() },
-      { id: '2', text: '⚡ Instant Payouts: bKash & Nagad cashouts are being processed within 15 mins.', type: 'INFO', active: true, createdAt: new Date().toISOString() }
-    ];
-  });
+  // Announcements — loaded from Supabase only
+  const [announcements, setAnnouncements] = useState<AnnouncementNotice[]>([]);
 
   // Categories
   const [categories, setCategories] = useState<EmailCategory[]>(() => {
@@ -150,17 +128,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : INITIAL_CATEGORIES;
   });
 
-  // Submissions
-  const [submissions, setSubmissions] = useState<EmailItem[]>(() => {
-    const saved = localStorage.getItem('mailvault_submissions');
-    return saved ? JSON.parse(saved) : INITIAL_SUBMISSIONS;
-  });
+  // Submissions — loaded from Supabase only
+  const [submissions, setSubmissions] = useState<EmailItem[]>([]);
 
-  // Withdrawals
-  const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>(() => {
-    const saved = localStorage.getItem('mailvault_withdrawals');
-    return saved ? JSON.parse(saved) : INITIAL_WITHDRAWALS;
-  });
+  // Withdrawals — loaded from Supabase only
+  const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
 
   // Track Referral Code from URL
   useEffect(() => {
@@ -171,7 +143,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, []);
 
-  // Local Storage Save
+  // One-time: clear any stale mock localStorage data from previous sessions
+  useEffect(() => {
+    const cleaned = localStorage.getItem('mailvault_db_cleaned_v2');
+    if (!cleaned) {
+      localStorage.removeItem('mailvault_submissions');
+      localStorage.removeItem('mailvault_withdrawals');
+      localStorage.removeItem('mailvault_announcements');
+      localStorage.setItem('mailvault_db_cleaned_v2', '1');
+    }
+  }, []);
+
+  // Local Storage Save — only save user session and categories
   useEffect(() => {
     if (currentUser) {
       localStorage.setItem('mailvault_current_user', JSON.stringify(currentUser));
@@ -179,10 +162,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       localStorage.removeItem('mailvault_current_user');
     }
   }, [currentUser]);
-
-  useEffect(() => {
-    localStorage.setItem('mailvault_announcements', JSON.stringify(announcements));
-  }, [announcements]);
 
   // Fetch initial data & subscribe to Supabase Realtime if configured
   useEffect(() => {
@@ -239,6 +218,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             processedAt: w.processed_at
           })));
         }
+
+        const { data: pmData } = await client.from('payout_methods').select('*');
+        if (pmData && pmData.length > 0) {
+          setPayoutMethods(pmData.map(p => ({
+            id: p.id,
+            name: p.name,
+            minAmount: Number(p.min_amount),
+            status: p.status
+          })));
+        }
+
+        const { data: ancData } = await client.from('announcements').select('*').order('created_at', { ascending: false });
+        if (ancData && ancData.length > 0) {
+          setAnnouncements(ancData.map(a => ({
+            id: a.id,
+            text: a.text,
+            type: a.type,
+            active: a.active,
+            createdAt: a.created_at
+          })));
+        }
       } catch (err) {
         console.warn('Supabase fetch error, falling back to local state:', err);
       }
@@ -250,6 +250,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .on('postgres_changes', { event: '*', schema: 'public', table: 'email_submissions' }, () => fetchFromSupabase())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'withdrawals' }, () => fetchFromSupabase())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, () => fetchFromSupabase())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payout_methods' }, () => fetchFromSupabase())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => fetchFromSupabase())
       .subscribe();
 
     return () => {
