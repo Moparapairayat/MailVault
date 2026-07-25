@@ -1,0 +1,179 @@
+import React from 'react';
+import { useApp } from '../context/AppContext';
+import { Mail, Wallet, Shield, Sparkles, ArrowRightLeft, Home, LayoutDashboard, PlusCircle } from 'lucide-react';
+
+interface NavbarProps {
+  activeTab: 'SELL' | 'DASHBOARD' | 'ADMIN';
+  setActiveTab: (tab: 'SELL' | 'DASHBOARD' | 'ADMIN') => void;
+  openSubmitModal: () => void;
+}
+
+export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, openSubmitModal }) => {
+  const { role, setRole, availableBalance, pendingBalance } = useApp();
+
+  return (
+    <>
+      {/* Desktop Header */}
+      <header className="sticky top-0 z-40 bg-[#070A12]/90 backdrop-blur-md border-b border-dark-border">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+          
+          {/* Brand Logo */}
+          <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab('SELL')}>
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-brand-600 via-brand-500 to-accent-cyan p-0.5 shadow-lg shadow-brand-500/20">
+              <div className="w-full h-full bg-dark-card rounded-[10px] flex items-center justify-center">
+                <Mail className="w-5 h-5 sm:w-6 sm:h-6 text-brand-400" />
+              </div>
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-xl sm:text-2xl tracking-tight text-white font-sans">
+                  Mail<span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-400 to-accent-cyan">Vault</span>
+                </span>
+                <span className="px-2 py-0.5 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider bg-brand-500/10 text-brand-400 border border-brand-500/20 rounded-full">
+                  Portal
+                </span>
+              </div>
+              <p className="text-[10px] sm:text-xs text-slate-400">Direct Email Procurement</p>
+            </div>
+          </div>
+
+          {/* Center Nav Links (Desktop) */}
+          <nav className="hidden md:flex items-center gap-1 bg-dark-card/80 p-1.5 rounded-xl border border-dark-border">
+            <button
+              onClick={() => setActiveTab('SELL')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                activeTab === 'SELL'
+                  ? 'bg-brand-500 text-white shadow-md shadow-brand-500/25'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-dark-hover'
+              }`}
+            >
+              Sell Rates & Calculator
+            </button>
+            
+            <button
+              onClick={() => setActiveTab('DASHBOARD')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                activeTab === 'DASHBOARD'
+                  ? 'bg-brand-500 text-white shadow-md shadow-brand-500/25'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-dark-hover'
+              }`}
+            >
+              Seller Dashboard
+            </button>
+
+            {role === 'ADMIN' && (
+              <button
+                onClick={() => setActiveTab('ADMIN')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                  activeTab === 'ADMIN'
+                    ? 'bg-accent-violet text-white shadow-md shadow-accent-violet/25'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-dark-hover'
+                }`}
+              >
+                <Shield className="w-4 h-4 text-amber-400" />
+                Admin Control Vault
+              </button>
+            )}
+          </nav>
+
+          {/* Right Action & Role Switcher */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            
+            {/* Seller Balance Pill */}
+            {role === 'SELLER' && (
+              <div className="flex items-center gap-1.5 bg-dark-card px-2.5 sm:px-3.5 py-1.5 rounded-xl border border-dark-border text-xs">
+                <Wallet className="w-4 h-4 text-brand-400" />
+                <div>
+                  <span className="text-slate-400 block text-[9px] leading-tight">Available</span>
+                  <span className="font-bold text-emerald-400 text-xs sm:text-sm">৳{availableBalance}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Sell Button CTA (Desktop) */}
+            {role === 'SELLER' && (
+              <button
+                onClick={openSubmitModal}
+                className="hidden sm:flex bg-gradient-to-r from-brand-500 to-accent-cyan text-slate-950 font-bold px-4 py-2 rounded-xl text-sm hover:brightness-110 transition-all shadow-lg shadow-brand-500/20 items-center gap-2"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>Sell Emails</span>
+              </button>
+            )}
+
+            {/* Admin / Seller Mode Switcher Toggle */}
+            <div className="pl-1 sm:pl-2 border-l border-dark-border">
+              <button
+                onClick={() => {
+                  const nextRole = role === 'SELLER' ? 'ADMIN' : 'SELLER';
+                  setRole(nextRole);
+                  setActiveTab(nextRole === 'ADMIN' ? 'ADMIN' : 'SELL');
+                }}
+                title="Click to toggle between Seller and Admin Panel view"
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold border transition-all ${
+                  role === 'ADMIN'
+                    ? 'bg-accent-purple/20 text-accent-purple border-accent-purple/40 hover:bg-accent-purple/30'
+                    : 'bg-dark-card text-slate-300 border-dark-border hover:bg-dark-hover'
+                }`}
+              >
+                <ArrowRightLeft className="w-3.5 h-3.5" />
+                <span className="hidden xs:inline">View:</span> <strong>{role}</strong>
+              </button>
+            </div>
+
+          </div>
+
+        </div>
+      </header>
+
+      {/* App-Like Mobile Bottom Navigation Bar */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#070A12]/95 backdrop-blur-lg border-t border-dark-border px-3 py-2">
+        <div className="flex items-center justify-around">
+          
+          <button
+            onClick={() => setActiveTab('SELL')}
+            className={`flex flex-col items-center gap-1 text-[10px] font-medium transition-all ${
+              activeTab === 'SELL' ? 'text-brand-400 font-bold' : 'text-slate-400'
+            }`}
+          >
+            <Home className="w-5 h-5" />
+            <span>Rates</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('DASHBOARD')}
+            className={`flex flex-col items-center gap-1 text-[10px] font-medium transition-all ${
+              activeTab === 'DASHBOARD' ? 'text-brand-400 font-bold' : 'text-slate-400'
+            }`}
+          >
+            <LayoutDashboard className="w-5 h-5" />
+            <span>Dashboard</span>
+          </button>
+
+          {/* Floating Sell CTA */}
+          {role === 'SELLER' && (
+            <button
+              onClick={openSubmitModal}
+              className="bg-gradient-to-r from-brand-500 to-accent-cyan text-slate-950 p-3 rounded-full shadow-lg shadow-brand-500/30 -mt-6 border-2 border-[#070A12]"
+            >
+              <PlusCircle className="w-6 h-6 fill-slate-950 text-brand-400" />
+            </button>
+          )}
+
+          {role === 'ADMIN' && (
+            <button
+              onClick={() => setActiveTab('ADMIN')}
+              className={`flex flex-col items-center gap-1 text-[10px] font-medium transition-all ${
+                activeTab === 'ADMIN' ? 'text-accent-purple font-bold' : 'text-slate-400'
+              }`}
+            >
+              <Shield className="w-5 h-5" />
+              <span>Admin</span>
+            </button>
+          )}
+
+        </div>
+      </div>
+    </>
+  );
+};
