@@ -19,6 +19,7 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({ openSubmitModa
     submissions,
     withdrawals,
     categories,
+    payoutMethods,
     requestWithdrawal,
     submitBatchEmails,
     updateUserProfile
@@ -830,10 +831,11 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({ openSubmitModa
                   }}
                   className="w-full bg-dark-bg border border-dark-border rounded-xl px-4 py-2.5 text-sm text-white font-semibold focus:outline-none focus:border-brand-500"
                 >
-                  <option value="bkash">bKash Personal</option>
-                  <option value="nagad">Nagad Personal</option>
-                  <option value="rocket">Rocket</option>
-                  <option value="usdt_trc20">Binance USDT (TRC20)</option>
+                  {payoutMethods.filter(pm => pm.status === 'ACTIVE').map(pm => (
+                    <option key={pm.id} value={pm.id}>
+                      {pm.name} (Min ৳{pm.minAmount})
+                    </option>
+                  ))}
                 </select>
               </div>
 

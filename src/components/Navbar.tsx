@@ -70,10 +70,14 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate, openSubmi
           {/* Right Action Controls */}
           <div className="flex items-center gap-2 sm:gap-3">
             
-            {/* Seller Balance Pill */}
+            {/* Seller Balance Pill with 1-Click Withdraw Cashout */}
             {currentUser && currentPath !== '/admin' && (
-              <div className="flex items-center gap-2 bg-dark-card px-3 py-1.5 rounded-xl border border-dark-border text-xs">
-                <Wallet className="w-4 h-4 text-emerald-400" />
+              <div
+                onClick={() => navigate('/seller')}
+                className="flex items-center gap-2 bg-dark-card hover:bg-dark-hover px-3 py-1.5 rounded-xl border border-dark-border text-xs cursor-pointer group transition-all"
+                title="Click to open Seller Dashboard & Withdraw Cash"
+              >
+                <Wallet className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-all" />
                 <div>
                   <span className="text-slate-400 block text-[9px] leading-tight">Ready Cash</span>
                   <span className="font-extrabold text-emerald-400 text-xs sm:text-sm">৳{availableBalance}</span>

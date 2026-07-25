@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { EmailCategory, EmailItem, WithdrawalRequest, UserRole, CategoryId, PaymentMethod, SubmissionStatus, UserProfile, AnnouncementNotice } from '../types';
+import { EmailCategory, EmailItem, WithdrawalRequest, UserRole, CategoryId, PaymentMethod, SubmissionStatus, UserProfile, AnnouncementNotice, PayoutMethodConfig } from '../types';
 import { INITIAL_CATEGORIES, INITIAL_SUBMISSIONS, INITIAL_WITHDRAWALS } from '../mockData';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { sendTelegramAlert } from '../lib/telegram';
@@ -21,6 +21,9 @@ interface AppContextType {
   submissions: EmailItem[];
   withdrawals: WithdrawalRequest[];
   announcements: AnnouncementNotice[];
+  payoutMethods: PayoutMethodConfig[];
+  addPayoutMethod: (name: string, minAmount: number) => void;
+  togglePayoutMethodStatus: (id: string) => void;
   
   // Auth Actions
   loginUser: (email: string, pass: string) => Promise<{ success: boolean; message: string }>;
@@ -101,10 +104,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('mailvault_theme', t);
   };
 
+  // Payout Methods Config State
+  const [payoutMethods, setPayoutMethods] = useState<PayoutMethodConfig[]>(() => {
+    const saved = localStorage.getItem('mailvault_payout_methods');
+    return saved ? JSON.parse(saved) : [
+      { id: 'bkash', name: 'bKash Personal', minAmount: 100, status: 'ACTIVE' },
+      { id: 'nagad', name: 'Nagad Personal', minAmount: 100, status: 'ACTIVE' },
+      { id: 'rocket', name: 'Rocket', minAmount: 100, status: 'ACTIVE' },
+      { id: 'usdt_trc20', name: 'Binance USDT (TRC20)', minAmount: 500, status: 'ACTIVE' },
+      { id: 'cellfin', name: 'Islami Bank CellFin', minAmount: 200, status: 'ACTIVE' },
+      { id: 'upay', name: 'Upay Personal', minAmount: 100, status: 'ACTIVE' },
+    ];
+  });
+
+  const addPayoutMethod = (name: string, minAmount: number) => {
+    const newMethod: PayoutMethodConfig = {
+      id: `pm_${Date.now()}`,
+      name: name.trim(),
+      minAmount,
+      status: 'ACTIVE'
+    };
+    const updated = [...payoutMethods, newMethod];
+    setPayoutMethods(updated);
+    localStorage.setItem('mailvault_payout_methods', JSON.stringify(updated));
+  };
+
+  const togglePayoutMethodStatus = (id: string) => {
+    const updated = payoutMethods.map(m => m.id === id ? { ...m, status: m.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE' } as PayoutMethodConfig : m);
+    setPayoutMethods(updated);
+    localStorage.setItem('mailvault_payout_methods', JSON.stringify(updated));
+  };
+
   // Announcements
   const [announcements, setAnnouncements] = useState<AnnouncementNotice[]>(() => {
     const saved = localStorage.getItem('mailvault_announcements');
-    return saved ? JSON.parse(saved) : INITIAL_NOTICES;
+    return saved ? JSON.parse(saved) : [
+      { id: '1', text: '🔥 High Demand Offer: Fresh Gmail buying rate increased to ৳18/pc today!', type: 'BONUS', active: true, createdAt: new Date().toISOString() },
+      { id: '2', text: '⚡ Instant Payouts: bKash & Nagad cashouts are being processed within 15 mins.', type: 'INFO', active: true, createdAt: new Date().toISOString() }
+    ];
   });
 
   // Categories
@@ -578,6 +615,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         submissions,
         withdrawals,
         announcements,
+        payoutMethods,
+        addPayoutMethod,
+        togglePayoutMethodStatus,
         loginUser,
         registerUser,
         updateUserProfile,

@@ -44,7 +44,14 @@ export interface SubmissionBatch {
   status: SubmissionStatus;
 }
 
-export type PaymentMethod = 'bkash' | 'nagad' | 'rocket' | 'usdt_trc20';
+export type PaymentMethod = string;
+
+export interface PayoutMethodConfig {
+  id: string;
+  name: string;
+  minAmount: number;
+  status: 'ACTIVE' | 'PAUSED';
+}
 
 export interface WithdrawalRequest {
   id: string;

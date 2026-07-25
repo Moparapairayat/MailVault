@@ -15,6 +15,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLockVault }) =
     submissions,
     withdrawals,
     announcements,
+    payoutMethods,
+    addPayoutMethod,
+    togglePayoutMethodStatus,
     updateCategoryRate,
     toggleCategoryStatus,
     reviewSubmission,
@@ -26,6 +29,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLockVault }) =
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<string>('overview');
+
+  // Payout Method Inputs
+  const [newMethodName, setNewMethodName] = useState('');
+  const [newMethodMin, setNewMethodMin] = useState(100);
 
   // Announcement inputs
   const [newNoticeInput, setNewNoticeInput] = useState('');
@@ -814,79 +821,208 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLockVault }) =
           </div>
         )}
 
-        {/* Tab 8: Seller Withdrawal Payout Releases */}
+        {/* Tab 8: Seller Withdrawal Payout Releases & Method Config */}
         {activeTab === 'payouts' && (
-          <div className="glass-card rounded-2xl border border-dark-border overflow-hidden">
-            <div className="p-6 border-b border-dark-border">
-              <h3 className="text-lg font-bold text-white">Seller Withdrawal Payout Releases</h3>
-              <p className="text-xs text-slate-400">Review payout requests, transfer cash via bKash/Nagad, and enter Transaction ID (TrxID).</p>
+          <div className="space-y-8">
+            
+            {/* Dynamic Payout Methods Management Card */}
+            <div className="glass-card p-6 rounded-2xl border border-brand-500/30 bg-gradient-to-r from-dark-card via-dark-panel to-dark-card shadow-xl">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-brand-500/20 border border-brand-500/30 flex items-center justify-center text-brand-400">
+                    <CreditCard className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Dynamic Payout Methods Manager</h3>
+                    <p className="text-xs text-slate-400">Add, enable, or pause cashout methods (bKash, Nagad, CellFin, Upay, Bank) shown to sellers.</p>
+                  </div>
+                </div>
+
+                {/* Add New Payout Method Form */}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (newMethodName.trim()) {
+                      addPayoutMethod(newMethodName, newMethodMin);
+                      setNewMethodName('');
+                    }
+                  }}
+                  className="flex flex-wrap items-center gap-2"
+                >
+                  <input
+                    type="text"
+                    placeholder="Method Name (e.g. Islami Bank CellFin)"
+                    value={newMethodName}
+                    onChange={(e) => setNewMethodName(e.target.value)}
+                    className="bg-dark-bg border border-dark-border rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-500 w-52"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Min BDT (100)"
+                    value={newMethodMin}
+                    onChange={(e) => setNewMethodMin(parseInt(e.target.value) || 100)}
+                    className="bg-dark-bg border border-dark-border rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-500 w-24"
+                  />
+                  <button
+                    type="submit"
+                    className="bg-brand-500 hover:bg-brand-600 text-white font-bold px-4 py-2 rounded-xl text-xs shadow-md"
+                  >
+                    + Add Method
+                  </button>
+                </form>
+              </div>
+
+              {/* Active Payout Methods Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {payoutMethods.map((pm) => (
+                  <div key={pm.id} className="bg-dark-bg p-3.5 rounded-xl border border-dark-border flex items-center justify-between">
+                    <div>
+                      <div className="font-bold text-xs text-white">{pm.name}</div>
+                      <span className="text-[10px] text-slate-400">Min Cashout: <strong>৳{pm.minAmount}</strong></span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => togglePayoutMethodStatus(pm.id)}
+                      className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all ${
+                        pm.status === 'ACTIVE'
+                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-rose-500/10 hover:text-rose-400'
+                          : 'bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-emerald-500/10 hover:text-emerald-400'
+                      }`}
+                    >
+                      {pm.status === 'ACTIVE' ? 'ACTIVE (Pause)' : 'PAUSED (Enable)'}
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
 
+            {/* Payout Releases Table */}
+            <div className="glass-card rounded-2xl border border-dark-border overflow-hidden">
+              <div className="p-6 border-b border-dark-border flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-bold text-white">Seller Withdrawal Payout Requests</h3>
+                  <p className="text-xs text-slate-400 font-medium">Review cashout requests, copy bKash/Nagad numbers, enter TrxID, and release payments.</p>
+                </div>
+
+                <div className="flex items-center gap-3 bg-dark-bg p-2 rounded-xl border border-dark-border text-xs">
+                  <span className="text-slate-400">Total Pending Cashouts:</span>
+                  <strong className="text-amber-400 font-extrabold text-sm">{withdrawals.filter(w => w.status === 'PENDING').length} Requests</strong>
+                </div>
+              </div>
+
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full text-left border-collapse min-w-[650px]">
                 <thead>
                   <tr className="bg-dark-panel/60 border-b border-dark-border text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
                     <th className="py-3.5 px-6">Seller & Account Details</th>
                     <th className="py-3.5 px-6">Amount</th>
                     <th className="py-3.5 px-6">Status</th>
-                    <th className="py-3.5 px-6">Enter Transaction ID (TrxID)</th>
-                    <th className="py-3.5 px-6 text-right">Action</th>
+                    <th className="py-3.5 px-6">Transaction ID (TrxID)</th>
+                    <th className="py-3.5 px-6 text-right">Admin Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-dark-border text-xs">
-                  {withdrawals.map((w) => (
-                    <tr key={w.id} className="hover:bg-dark-hover/50 transition-all">
-                      <td className="py-4 px-6">
-                        <div className="font-bold text-white">{w.sellerName}</div>
-                        <div className="text-[11px] text-brand-400 font-mono font-semibold uppercase">{w.method}: {w.accountDetails}</div>
-                      </td>
-
-                      <td className="py-4 px-6 font-black text-emerald-400 text-sm">
-                        ৳{w.amount}
-                      </td>
-
-                      <td className="py-4 px-6">
-                        {w.status === 'COMPLETED' ? (
-                          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                            Paid ({w.transactionId})
-                          </span>
-                        ) : (
-                          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                            Awaiting Payment
-                          </span>
-                        )}
-                      </td>
-
-                      <td className="py-4 px-6">
-                        {w.status === 'PENDING' ? (
-                          <input
-                            type="text"
-                            placeholder="e.g. BK98765432X"
-                            value={trxIdInputs[w.id] || ''}
-                            onChange={(e) => setTrxIdInputs({ ...trxIdInputs, [w.id]: e.target.value })}
-                            className="bg-dark-bg border border-dark-border rounded-lg px-3 py-1.5 text-xs text-white font-mono w-44"
-                          />
-                        ) : (
-                          <span className="font-mono text-slate-400">{w.transactionId}</span>
-                        )}
-                      </td>
-
-                      <td className="py-4 px-6 text-right">
-                        {w.status === 'PENDING' && (
-                          <button
-                            onClick={() => processWithdrawal(w.id, 'COMPLETED', trxIdInputs[w.id] || 'TRX-DEFAULT-123')}
-                            className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-4 py-1.5 rounded-lg text-xs transition-all shadow-md"
-                          >
-                            Mark as Paid
-                          </button>
-                        )}
+                  {withdrawals.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-slate-500 font-medium">
+                        No withdrawal payout requests submitted yet.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    withdrawals.map((w) => (
+                      <tr key={w.id} className="hover:bg-dark-hover/50 transition-all">
+                        <td className="py-4 px-6">
+                          <div className="font-bold text-white text-sm">{w.sellerName}</div>
+                          <div className="text-xs text-brand-400 font-mono font-bold uppercase mt-0.5 flex items-center gap-2">
+                            <span>{w.method}: {w.accountDetails}</span>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(`${w.accountDetails}`);
+                                alert(`Copied account number: ${w.accountDetails}`);
+                              }}
+                              className="text-slate-400 hover:text-white p-1"
+                              title="Copy Number"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+
+                        <td className="py-4 px-6 font-black text-emerald-400 text-base">
+                          ৳{w.amount}
+                        </td>
+
+                        <td className="py-4 px-6">
+                          {w.status === 'COMPLETED' ? (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                              Paid ✔ ({w.transactionId})
+                            </span>
+                          ) : w.status === 'REJECTED' ? (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                              Rejected ✖
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                              Awaiting Payout
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="py-4 px-6">
+                          {w.status === 'PENDING' ? (
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                placeholder="e.g. BK98765432X"
+                                value={trxIdInputs[w.id] || ''}
+                                onChange={(e) => setTrxIdInputs({ ...trxIdInputs, [w.id]: e.target.value })}
+                                className="bg-dark-bg border border-dark-border rounded-lg px-3 py-1.5 text-xs text-white font-mono w-36"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const autoTx = `BK${Math.floor(100000000 + Math.random() * 900000000)}`;
+                                  setTrxIdInputs({ ...trxIdInputs, [w.id]: autoTx });
+                                }}
+                                className="px-2 py-1 rounded bg-dark-panel hover:bg-dark-hover border border-dark-border text-[10px] text-slate-300 font-mono"
+                                title="Auto Generate TrxID"
+                              >
+                                Auto TrxID
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="font-mono text-slate-300 font-bold">{w.transactionId || 'N/A'}</span>
+                          )}
+                        </td>
+
+                        <td className="py-4 px-6 text-right space-x-2">
+                          {w.status === 'PENDING' && (
+                            <>
+                              <button
+                                onClick={() => processWithdrawal(w.id, 'REJECTED', 'Refunded by Admin')}
+                                className="bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 font-bold px-3 py-1.5 rounded-lg text-xs transition-all border border-rose-500/30"
+                              >
+                                Reject
+                              </button>
+
+                              <button
+                                onClick={() => processWithdrawal(w.id, 'COMPLETED', trxIdInputs[w.id] || `BK${Math.floor(100000000 + Math.random() * 900000000)}`)}
+                                className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-4 py-1.5 rounded-lg text-xs transition-all shadow-md shadow-emerald-500/20 cursor-pointer"
+                              >
+                                Release Cash & Send TrxID
+                              </button>
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
           </div>
+        </div>
         )}
 
       </main>
