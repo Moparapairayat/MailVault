@@ -106,8 +106,8 @@ const MainLayout: React.FC = () => {
         initialMode={authMode}
       />
 
-      {/* Footer */}
-      <Footer />
+      {/* Public Footer (Only rendered on Home page) */}
+      {currentPath === '/' && <Footer />}
     </div>
   );
 };
