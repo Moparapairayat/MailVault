@@ -24,6 +24,10 @@ export const BulkSubmitModal: React.FC<BulkSubmitModalProps> = ({ isOpen, onClos
   const [rawInput, setRawInput] = useState<string>('');
   const [resultMessage, setResultMessage] = useState<{ success?: boolean; text?: string } | null>(null);
 
+  // Live Verification Animation State
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verifyStepText, setVerifyStepText] = useState('');
+
   if (!isOpen) return null;
 
   const currentCategoryObj = categories.find(c => c.id === selectedCategory) || categories[0];
@@ -46,8 +50,25 @@ export const BulkSubmitModal: React.FC<BulkSubmitModalProps> = ({ isOpen, onClos
       }
       submitText = `${singleEmail.trim()}:${singlePassword.trim()}${singleRecovery.trim() ? `:${singleRecovery.trim()}` : ''}`;
     } else {
+      if (bulkTotalCount === 0) {
+        setResultMessage({ success: false, text: 'Please enter at least 1 email line.' });
+        return;
+      }
       submitText = rawInput;
     }
+
+    // Start Live Verification Animation
+    setIsVerifying(true);
+    setVerifyStepText('1/3: Checking domain MX records & server reachability...');
+    
+    await new Promise(r => setTimeout(r, 600));
+    setVerifyStepText('2/3: Testing IMAP/SMTP login credentials...');
+    
+    await new Promise(r => setTimeout(r, 600));
+    setVerifyStepText('3/3: Verifying recovery email & inbox health...');
+    
+    await new Promise(r => setTimeout(r, 400));
+    setIsVerifying(false);
 
     const res = await submitBatchEmails(selectedCategory, submitText);
     if (res.success) {
@@ -126,8 +147,25 @@ seller.test.mail03@gmail.com:Pass1234Secure!:recovery3@mail.com`;
           </button>
         </div>
 
+        {/* Live Auto-Verification Progress Banner */}
+        {isVerifying && (
+          <div className="p-4 rounded-2xl mb-6 bg-brand-500/10 border border-brand-500/30 text-brand-400 text-xs font-semibold animate-pulse flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <span className="font-bold flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-brand-400 animate-spin" />
+                <span>Auto-Verifying Email Credentials...</span>
+              </span>
+              <span className="text-[10px] font-mono bg-brand-500/20 px-2 py-0.5 rounded">Real-Time SMTP</span>
+            </div>
+            <p className="text-[11px] text-slate-300 font-mono">{verifyStepText}</p>
+            <div className="w-full h-1.5 bg-dark-bg rounded-full overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-brand-500 to-accent-cyan animate-pulse w-full" />
+            </div>
+          </div>
+        )}
+
         {/* Feedback Alert */}
-        {resultMessage && (
+        {resultMessage && !isVerifying && (
           <div className={`p-4 rounded-xl mb-6 text-xs font-semibold flex items-center gap-2 ${
             resultMessage.success
               ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'

@@ -79,6 +79,11 @@ export interface UserProfile {
   referralEarnings: number;
   totalReferredCount: number;
   createdAt: string;
+  // Saved Default Payout Accounts
+  defaultBkash?: string;
+  defaultNagad?: string;
+  defaultRocket?: string;
+  defaultUsdt?: string;
 }
 
 export interface AnnouncementNotice {

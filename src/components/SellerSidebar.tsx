@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
-import { LayoutDashboard, Clock, CheckCircle2, Award, LogOut, Wallet, PlusCircle } from 'lucide-react';
+import { LayoutDashboard, Clock, CheckCircle2, Award, LogOut, Wallet, PlusCircle, User } from 'lucide-react';
 
 interface SellerSidebarProps {
   activeSection: string;
@@ -23,6 +23,7 @@ export const SellerSidebar: React.FC<SellerSidebarProps> = ({ activeSection, set
     { id: 'submissions', label: 'Submissions History', icon: Clock },
     { id: 'withdrawals', label: 'Cashout Payouts', icon: CheckCircle2 },
     { id: 'referrals', label: 'Referral Bonus (3%)', icon: Award },
+    { id: 'profile', label: 'Profile & Settings', icon: User },
   ];
 
   return (

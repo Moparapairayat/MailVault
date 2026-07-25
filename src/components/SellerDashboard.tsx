@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { PaymentMethod, CategoryId } from '../types';
 import { SellerSidebar } from './SellerSidebar';
-import { Wallet, ArrowDownRight, Clock, CheckCircle2, XCircle, Search, Copy, Check, Sparkles, Award, UploadCloud, Share2, MessageSquare, Send, CreditCard, Layers } from 'lucide-react';
+import { TopSellerLeaderboard } from './TopSellerLeaderboard';
+import { Wallet, ArrowDownRight, Clock, CheckCircle2, XCircle, Search, Copy, Check, Sparkles, Award, UploadCloud, Share2, MessageSquare, Send, CreditCard, Layers, Download, Smartphone } from 'lucide-react';
 
 interface SellerDashboardProps {
   openSubmitModal: (categoryId?: CategoryId) => void;
@@ -19,7 +20,8 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({ openSubmitModa
     withdrawals,
     categories,
     requestWithdrawal,
-    submitBatchEmails
+    submitBatchEmails,
+    updateUserProfile
   } = useApp();
 
   const [activeSection, setActiveSection] = useState<string>('overview');
@@ -27,6 +29,30 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({ openSubmitModa
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedRef, setCopiedRef] = useState<boolean>(false);
+
+  // Profile Form State
+  const [nameInput, setNameInput] = useState(currentUser?.name || '');
+  const [phoneInput, setPhoneInput] = useState(currentUser?.phone || '');
+  const [bkashInput, setBkashInput] = useState(currentUser?.defaultBkash || '');
+  const [nagadInput, setNagadInput] = useState(currentUser?.defaultNagad || '');
+  const [rocketInput, setRocketInput] = useState(currentUser?.defaultRocket || '');
+  const [usdtInput, setUsdtInput] = useState(currentUser?.defaultUsdt || '');
+  const [profileNotice, setProfileNotice] = useState<{ success: boolean; text: string } | null>(null);
+
+  const handleProfileSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProfileNotice(null);
+    const res = await updateUserProfile({
+      name: nameInput,
+      phone: phoneInput,
+      defaultBkash: bkashInput,
+      defaultNagad: nagadInput,
+      defaultRocket: rocketInput,
+      defaultUsdt: usdtInput
+    });
+    setProfileNotice({ success: res.success, text: res.message });
+    setTimeout(() => setProfileNotice(null), 3000);
+  };
 
   // File Drag & Drop State
   const [isDragging, setIsDragging] = useState<boolean>(false);
@@ -117,6 +143,20 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({ openSubmitModa
     }
   };
 
+  const handleDownloadCSV = () => {
+    let csvContent = "data:text/csv;charset=utf-8,Email,Category,Rate (BDT),Status,Submitted At\n";
+    mySubmissions.forEach(s => {
+      csvContent += `"${s.email}","${s.categoryId}","${s.rate}","${s.status}","${new Date(s.submittedAt).toLocaleString()}"\n`;
+    });
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `MailVault_Statement_${currentUser?.name || 'Seller'}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const getCategoryName = (id: string) => categories.find(c => c.id === id)?.name || id;
 
   const shareText = encodeURIComponent(`Sell your verified Gmails & Edu Mails directly to MailVault for instant bKash/Nagad payouts! Join via my link: ${refLink}`);
@@ -163,6 +203,28 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({ openSubmitModa
             <Sparkles className="w-4 h-4" />
             <span>Submit Bulk Mails</span>
           </button>
+        </div>
+
+        {/* Gamified Tier Milestone Level Progress Bar */}
+        <div className="glass-card p-4 sm:p-5 rounded-2xl border border-brand-500/20 mb-6 bg-gradient-to-r from-dark-card to-dark-panel">
+          <div className="flex items-center justify-between text-xs font-bold mb-2">
+            <span className="text-white flex items-center gap-2">
+              <Award className="w-4 h-4 text-brand-400" />
+              <span>Next Level Progress: <strong className="text-brand-400">Gold VIP Tier</strong></span>
+            </span>
+            <span className="text-slate-400 font-mono text-[11px]">{totalApprovedCount} / 500 Accounts Approved</span>
+          </div>
+
+          <div className="w-full h-2.5 bg-dark-bg rounded-full overflow-hidden border border-dark-border">
+            <div
+              className="h-full bg-gradient-to-r from-brand-500 via-accent-cyan to-emerald-400 transition-all duration-500"
+              style={{ width: `${Math.min(100, (totalApprovedCount / 500) * 100)}%` }}
+            />
+          </div>
+
+          <span className="text-[10px] text-slate-400 mt-1.5 block">
+            Unlock <strong>Gold VIP (+৳1.0/pc bonus & 10-Min Payouts)</strong> by approving {Math.max(0, 500 - totalApprovedCount)} more accounts!
+          </span>
         </div>
 
         {/* View 1: Overview & Wallet Summary */}
@@ -300,7 +362,7 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({ openSubmitModa
 
               <div
                 onClick={() => setActiveSection('withdrawals')}
-                className="glass-card p-5 rounded-2xl border border-dark-border hover:border-emerald-500/50 cursor-pointer transition-all bg-gradient-to-br from-dark-card to-dark-panel"
+                className="glass-card p-5 rounded-2xl border border-emerald-500/50 cursor-pointer transition-all bg-gradient-to-br from-dark-card to-dark-panel"
               >
                 <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mb-3">
                   <CreditCard className="w-4 h-4" />
@@ -310,15 +372,20 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({ openSubmitModa
               </div>
 
               <div
-                onClick={() => setActiveSection('referrals')}
-                className="glass-card p-5 rounded-2xl border border-dark-border hover:border-purple-500/50 cursor-pointer transition-all bg-gradient-to-br from-dark-card to-dark-panel"
+                onClick={handleDownloadCSV}
+                className="glass-card p-5 rounded-2xl border border-purple-500/50 cursor-pointer transition-all bg-gradient-to-br from-dark-card to-dark-panel group"
               >
-                <div className="w-9 h-9 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center mb-3">
-                  <Award className="w-4 h-4" />
+                <div className="w-9 h-9 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center mb-3 group-hover:scale-110 transition-all">
+                  <Download className="w-4 h-4" />
                 </div>
-                <h4 className="font-bold text-white text-xs sm:text-sm">Referral Program (3%)</h4>
-                <p className="text-[11px] text-slate-400 mt-1">Share your link to WhatsApp, Telegram or Facebook.</p>
+                <h4 className="font-bold text-white text-xs sm:text-sm">Download Earnings Statement</h4>
+                <p className="text-[11px] text-slate-400 mt-1">1-Click CSV export of your submission records.</p>
               </div>
+            </div>
+
+            {/* Weekly Top Seller Leaderboard Widget */}
+            <div className="mt-8">
+              <TopSellerLeaderboard />
             </div>
           </div>
         )}
@@ -516,7 +583,120 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({ openSubmitModa
           </div>
         )}
 
-        {/* View 4: Withdrawal / Cashout Requests Table Only */}
+        {/* View 5: Seller Profile & Account Settings Only */}
+        {activeSection === 'profile' && (
+          <div className="space-y-6">
+            <div className="glass-card p-6 sm:p-8 rounded-3xl border border-brand-500/30 bg-gradient-to-br from-dark-card via-dark-panel to-dark-card shadow-xl">
+              <div className="flex items-center gap-4 mb-6 pb-6 border-b border-dark-border">
+                <div className="w-16 h-16 rounded-2xl bg-brand-500/20 border border-brand-500/40 flex items-center justify-center text-brand-400 font-extrabold text-2xl">
+                  {currentUser ? currentUser.name.charAt(0).toUpperCase() : 'K'}
+                </div>
+                <div>
+                  <h3 className="text-xl font-extrabold text-white">{currentUser?.name || 'Karim Ahmed'}</h3>
+                  <p className="text-xs text-slate-400">Manage your profile, phone number, and saved default cashout accounts.</p>
+                </div>
+              </div>
+
+              {profileNotice && (
+                <div className={`p-4 rounded-xl mb-6 text-xs font-semibold flex items-center gap-2 ${
+                  profileNotice.success ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
+                }`}>
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>{profileNotice.text}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleProfileSave} className="space-y-6">
+                
+                {/* Personal Information */}
+                <div>
+                  <h4 className="text-xs font-bold text-brand-400 uppercase tracking-wider mb-4">Personal Details</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1">Full Name</label>
+                      <input
+                        type="text"
+                        value={nameInput}
+                        onChange={(e) => setNameInput(e.target.value)}
+                        className="w-full bg-dark-bg border border-dark-border rounded-xl px-4 py-2.5 text-xs text-white font-semibold focus:outline-none focus:border-brand-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1">Phone Number (bKash/Nagad)</label>
+                      <input
+                        type="text"
+                        value={phoneInput}
+                        onChange={(e) => setPhoneInput(e.target.value)}
+                        className="w-full bg-dark-bg border border-dark-border rounded-xl px-4 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-brand-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Saved Default Payout Accounts */}
+                <div>
+                  <h4 className="text-xs font-bold text-brand-400 uppercase tracking-wider mb-4">Saved Default Cashout Accounts</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1">Default bKash Personal Number</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 01711223344"
+                        value={bkashInput}
+                        onChange={(e) => setBkashInput(e.target.value)}
+                        className="w-full bg-dark-bg border border-dark-border rounded-xl px-4 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-brand-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1">Default Nagad Personal Number</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 01811223344"
+                        value={nagadInput}
+                        onChange={(e) => setNagadInput(e.target.value)}
+                        className="w-full bg-dark-bg border border-dark-border rounded-xl px-4 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-brand-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1">Default Rocket Account Number</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 019112233447"
+                        value={rocketInput}
+                        onChange={(e) => setRocketInput(e.target.value)}
+                        className="w-full bg-dark-bg border border-dark-border rounded-xl px-4 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-brand-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1">Default Binance USDT Address (TRC20)</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. TXYZ123456789..."
+                        value={usdtInput}
+                        onChange={(e) => setUsdtInput(e.target.value)}
+                        className="w-full bg-dark-bg border border-dark-border rounded-xl px-4 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-brand-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-dark-border flex justify-end">
+                  <button
+                    type="submit"
+                    className="bg-gradient-to-r from-brand-500 to-accent-cyan text-slate-950 font-extrabold px-6 py-3 rounded-xl text-xs shadow-lg shadow-brand-500/20 hover:brightness-110 transition-all cursor-pointer"
+                  >
+                    Save Profile & Accounts
+                  </button>
+                </div>
+
+              </form>
+            </div>
+          </div>
+        )}
         {activeSection === 'withdrawals' && (
           <div className="glass-card rounded-2xl border border-dark-border overflow-hidden">
             <div className="p-4 sm:p-6 border-b border-dark-border">
@@ -640,7 +820,14 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({ openSubmitModa
                 <label className="block text-xs font-semibold text-slate-300 mb-1">Payment Method</label>
                 <select
                   value={withdrawMethod}
-                  onChange={(e) => setWithdrawMethod(e.target.value as PaymentMethod)}
+                  onChange={(e) => {
+                    const m = e.target.value as PaymentMethod;
+                    setWithdrawMethod(m);
+                    if (m === 'bkash' && currentUser?.defaultBkash) setAccountDetails(currentUser.defaultBkash);
+                    else if (m === 'nagad' && currentUser?.defaultNagad) setAccountDetails(currentUser.defaultNagad);
+                    else if (m === 'rocket' && currentUser?.defaultRocket) setAccountDetails(currentUser.defaultRocket);
+                    else if (m === 'usdt_trc20' && currentUser?.defaultUsdt) setAccountDetails(currentUser.defaultUsdt);
+                  }}
                   className="w-full bg-dark-bg border border-dark-border rounded-xl px-4 py-2.5 text-sm text-white font-semibold focus:outline-none focus:border-brand-500"
                 >
                   <option value="bkash">bKash Personal</option>
@@ -659,6 +846,17 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({ openSubmitModa
                   onChange={(e) => setAccountDetails(e.target.value)}
                   className="w-full bg-dark-bg border border-dark-border rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-500 font-mono"
                 />
+              </div>
+
+              {/* Simulated Mobile SMS Payout Preview Card */}
+              <div className="bg-slate-900 p-3.5 rounded-2xl border border-pink-500/30 font-mono text-[11px] text-pink-300 space-y-1 my-3">
+                <div className="flex items-center gap-1.5 font-bold text-pink-400">
+                  <Smartphone className="w-3.5 h-3.5" />
+                  <span>bKash / SMS Alert Preview:</span>
+                </div>
+                <p className="text-[10px] text-slate-300 leading-snug">
+                  "You have received <strong>৳{withdrawAmount}</strong> from <strong>MailVault Direct</strong>. TrxID <span className="text-emerald-400">9K7X81MLQ2</span>. Fee ৳0.00."
+                </p>
               </div>
 
               <div className="pt-2 flex items-center justify-end gap-2">

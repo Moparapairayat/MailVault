@@ -180,8 +180,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLockVault }) =
         })}
       />
 
-      {/* Main Content Area */}
-      <main className="flex-1 py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto overflow-x-hidden">
+      {/* Main Content Area - pb-24 for Mobile Bottom Bar clearance */}
+      <main className="flex-1 py-6 px-3 sm:px-6 lg:px-8 max-w-7xl mx-auto overflow-x-hidden pb-24 md:pb-12">
         
         {/* Top Banner Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 bg-gradient-to-r from-accent-purple/20 via-dark-card to-dark-card p-6 rounded-3xl border border-accent-purple/30">

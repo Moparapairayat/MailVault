@@ -10,6 +10,7 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { AdminLockPage } from './components/AdminLockPage';
 import { AuthModal } from './components/AuthModal';
 import { Footer } from './components/Footer';
+import { LiveSupportWidget } from './components/LiveSupportWidget';
 import { CategoryId } from './types';
 
 const MainLayout: React.FC = () => {
@@ -108,6 +109,9 @@ const MainLayout: React.FC = () => {
 
       {/* Public Footer (Only rendered on Home page) */}
       {currentPath === '/' && <Footer />}
+
+      {/* Floating 24/7 Live Support Widget */}
+      <LiveSupportWidget />
     </div>
   );
 };

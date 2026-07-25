@@ -3,12 +3,20 @@ import { EmailCategory, EmailItem, WithdrawalRequest, UserRole, CategoryId, Paym
 import { INITIAL_CATEGORIES, INITIAL_SUBMISSIONS, INITIAL_WITHDRAWALS } from '../mockData';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { sendTelegramAlert } from '../lib/telegram';
+import { playCashSound, playSuccessSound } from '../utils/audio';
 import confetti from 'canvas-confetti';
+
+export type AppTheme = 'emerald' | 'purple' | 'cyan' | 'gold' | 'ruby';
+export type AppLang = 'en' | 'bn';
 
 interface AppContextType {
   currentUser: UserProfile | null;
   role: UserRole;
   setRole: (role: UserRole) => void;
+  lang: AppLang;
+  setLang: (l: AppLang) => void;
+  theme: AppTheme;
+  setTheme: (t: AppTheme) => void;
   categories: EmailCategory[];
   submissions: EmailItem[];
   withdrawals: WithdrawalRequest[];
@@ -17,6 +25,7 @@ interface AppContextType {
   // Auth Actions
   loginUser: (email: string, pass: string) => Promise<{ success: boolean; message: string }>;
   registerUser: (email: string, pass: string, name: string, phone: string) => Promise<{ success: boolean; message: string }>;
+  updateUserProfile: (updatedFields: Partial<UserProfile>) => Promise<{ success: boolean; message: string }>;
   logoutUser: () => void;
   
   // Seller Actions
@@ -73,6 +82,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Role
   const [role, setRole] = useState<UserRole>('SELLER');
+  
+  const [lang, setLangState] = useState<AppLang>(() => {
+    return (localStorage.getItem('mailvault_lang') as AppLang) || 'en';
+  });
+
+  const [theme, setThemeState] = useState<AppTheme>(() => {
+    return (localStorage.getItem('mailvault_theme') as AppTheme) || 'emerald';
+  });
+
+  const setLang = (l: AppLang) => {
+    setLangState(l);
+    localStorage.setItem('mailvault_lang', l);
+  };
+
+  const setTheme = (t: AppTheme) => {
+    setThemeState(t);
+    localStorage.setItem('mailvault_theme', t);
+  };
 
   // Announcements
   const [announcements, setAnnouncements] = useState<AnnouncementNotice[]>(() => {
@@ -250,6 +277,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true, message: 'Seller account registered successfully!' };
   };
 
+  const updateUserProfile = async (updatedFields: Partial<UserProfile>) => {
+    if (!currentUser) return { success: false, message: 'User not logged in.' };
+    const updated = { ...currentUser, ...updatedFields };
+    setCurrentUser(updated);
+    localStorage.setItem('mailvault_current_user', JSON.stringify(updated));
+    return { success: true, message: 'Profile updated successfully!' };
+  };
+
   const logoutUser = () => {
     setCurrentUser(null);
     setRole('SELLER');
@@ -390,6 +425,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       spread: 60,
       origin: { y: 0.7 }
     });
+    
+    playSuccessSound();
 
     return {
       success: true,
@@ -444,6 +481,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       `<b>Method:</b> ${method.toUpperCase()}\n` +
       `<b>Account / Address:</b> <code>${accountDetails.trim()}</code>`
     );
+
+    // Play Cha-ching cash sound FX
+    playCashSound();
 
     return { success: true, message: `Withdrawal request of ৳${amount} submitted! Admin will process via ${method.toUpperCase()}.` };
   };
@@ -530,12 +570,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         currentUser,
         role,
         setRole,
+        lang,
+        setLang,
+        theme,
+        setTheme,
         categories,
         submissions,
         withdrawals,
         announcements,
         loginUser,
         registerUser,
+        updateUserProfile,
         logoutUser,
         submitBatchEmails,
         requestWithdrawal,
