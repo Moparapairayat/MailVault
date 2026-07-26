@@ -5,15 +5,16 @@ import { Mail, Lock, Phone, User, X, CheckCircle2, AlertTriangle, ArrowRight, Sh
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialMode?: 'LOGIN' | 'SIGNUP';
+  initialMode?: 'LOGIN' | 'SIGNUP' | 'ADMIN_LOGIN';
   onSuccess?: () => void;
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'LOGIN', onSuccess }) => {
   const { loginUser, registerUser } = useApp();
 
-  const [mode, setMode] = useState<'LOGIN' | 'SIGNUP'>(initialMode);
+  const [mode, setMode] = useState<'LOGIN' | 'SIGNUP' | 'ADMIN_LOGIN'>(initialMode);
   const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -21,9 +22,28 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMo
 
   if (!isOpen) return null;
 
+  React.useEffect(() => {
+    setMode(initialMode);
+  }, [initialMode]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setNotice(null);
+
+    if (mode === 'ADMIN_LOGIN') {
+      const res = await loginUser(identifier, password);
+      if (res.success) {
+        setNotice({ success: true, message: 'Admin login successful! Redirecting...' });
+        setTimeout(() => {
+          onClose();
+          setNotice(null);
+          onSuccess?.();
+        }, 900);
+      } else {
+        setNotice({ success: false, message: res.message });
+      }
+      return;
+    }
 
     if (mode === 'LOGIN') {
       const res = await loginUser(email, password);
@@ -63,11 +83,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMo
         <div className="flex items-center justify-between pb-4 border-b border-dark-border mb-6">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-brand-500/20 border border-brand-500/30 flex items-center justify-center text-brand-400">
-              {mode === 'LOGIN' ? <User className="w-5 h-5" /> : <Shield className="w-5 h-5 text-accent-cyan" />}
+              {mode === 'ADMIN_LOGIN' ? <Shield className="w-5 h-5" /> : mode === 'LOGIN' ? <User className="w-5 h-5" /> : <Shield className="w-5 h-5 text-accent-cyan" />}
             </div>
             <div>
-              <h2 className="text-xl font-bold text-white">{mode === 'LOGIN' ? 'Seller Login' : 'Create Seller Account'}</h2>
-              <p className="text-xs text-slate-400">Access your wallet, submissions & cashouts</p>
+              <h2 className="text-xl font-bold text-white">{mode === 'ADMIN_LOGIN' ? 'Admin Login' : mode === 'LOGIN' ? 'Seller Login' : 'Create Seller Account'}</h2>
+              <p className="text-xs text-slate-400">{mode === 'ADMIN_LOGIN' ? 'Access admin control vault' : 'Access your wallet, submissions & cashouts'}</p>
             </div>
           </div>
 
@@ -126,20 +146,37 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMo
             </div>
           )}
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Email Address</label>
-            <div className="relative">
-              <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="email"
-                required
-                placeholder="seller@gmail.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-dark-bg border border-dark-border rounded-xl pl-10 pr-4 py-2.5 text-xs text-white focus:outline-none focus:border-brand-500 font-mono"
-              />
+          {mode === 'ADMIN_LOGIN' ? (
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Username or Email</label>
+              <div className="relative">
+                <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  required
+                  placeholder="admin or admin@mailvault.com"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  className="w-full bg-dark-bg border border-dark-border rounded-xl pl-10 pr-4 py-2.5 text-xs text-white focus:outline-none focus:border-brand-500 font-mono"
+                />
+              </div>
             </div>
-          </div>
+          ) : (
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Email Address</label>
+              <div className="relative">
+                <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="email"
+                  required
+                  placeholder="seller@gmail.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full bg-dark-bg border border-dark-border rounded-xl pl-10 pr-4 py-2.5 text-xs text-white focus:outline-none focus:border-brand-500 font-mono"
+                />
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Password</label>
@@ -160,7 +197,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMo
             type="submit"
             className="w-full mt-2 py-3 rounded-xl bg-gradient-to-r from-brand-500 to-accent-cyan text-slate-950 font-bold text-xs hover:brightness-110 transition-all shadow-lg shadow-brand-500/20 flex items-center justify-center gap-2 cursor-pointer"
           >
-            <span>{mode === 'LOGIN' ? 'Login to Dashboard' : 'Create Seller Account'}</span>
+            <span>{mode === 'ADMIN_LOGIN' ? 'Login to Admin Vault' : mode === 'LOGIN' ? 'Login to Dashboard' : 'Create Seller Account'}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
 
@@ -168,15 +205,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMo
 
         {/* Toggle Mode */}
         <div className="mt-6 pt-4 border-t border-dark-border text-center text-xs text-slate-400">
-          {mode === 'LOGIN' ? (
+          {mode === 'LOGIN' || mode === 'ADMIN_LOGIN' ? (
             <p>
-              Don't have an account?{' '}
+              {mode === 'LOGIN' ? "Don't have an account? " : 'Back to '}
               <button
                 type="button"
-                onClick={() => { setMode('SIGNUP'); setNotice(null); }}
+                onClick={() => { 
+                  if (mode === 'ADMIN_LOGIN') {
+                    setMode('LOGIN');
+                  } else {
+                    setMode('SIGNUP'); 
+                  }
+                  setNotice(null); 
+                }}
                 className="text-brand-400 font-bold hover:underline"
               >
-                Sign Up Free
+                {mode === 'ADMIN_LOGIN' ? 'Seller Login' : 'Sign Up Free'}
               </button>
             </p>
           ) : (

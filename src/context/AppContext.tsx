@@ -26,10 +26,11 @@ interface AppContextType {
   togglePayoutMethodStatus: (id: string) => void;
   
   // Auth Actions
-  loginUser: (email: string, pass: string) => Promise<{ success: boolean; message: string }>;
+  loginUser: (identifier: string, pass: string) => Promise<{ success: boolean; message: string }>;
   registerUser: (email: string, pass: string, name: string, phone: string) => Promise<{ success: boolean; message: string }>;
   updateUserProfile: (updatedFields: Partial<UserProfile>) => Promise<{ success: boolean; message: string }>;
   logoutUser: () => void;
+  setupFirstAdmin: (name: string, username: string, email: string, password: string) => Promise<{ success: boolean; message: string }>;
   
   // Seller Actions
   submitBatchEmails: (categoryId: CategoryId, rawText: string) => Promise<{ success: boolean; added: number; duplicates: number; message: string }>;
@@ -272,19 +273,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [withdrawals]);
 
   // Auth Methods
-  const loginUser = async (email: string, pass: string) => {
-    if (!email || !pass) return { success: false, message: 'Please enter email and password.' };
+  const loginUser = async (identifier: string, pass: string) => {
+    if (!identifier || !pass) return { success: false, message: 'Please enter username/email and password.' };
 
     const client = supabase;
 
     // Supabase configured হলে database থেকে verify করো
     if (isSupabaseConfigured && client) {
-      const { data, error } = await client
+      const query = client
         .from('profiles')
         .select('*')
-        .eq('email', email.toLowerCase().trim())
-        .eq('password', pass)
-        .maybeSingle();
+        .eq('password', pass);
+
+      if (identifier.includes('@')) {
+        query.eq('email', identifier.toLowerCase().trim());
+      } else {
+        query.eq('username', identifier.trim().toLowerCase());
+      }
+
+      const { data, error } = await query.maybeSingle();
 
       if (error) {
         console.error('Login DB error:', error);
@@ -292,7 +299,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       if (!data) {
-        return { success: false, message: 'Invalid email or password. Please check and try again.' };
+        return { success: false, message: 'Invalid username/email or password. Please check and try again.' };
       }
 
       const user: UserProfile = {
@@ -302,6 +309,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         phone: data.phone || '',
         role: data.role || 'SELLER',
         refCode: data.ref_code || '',
+        username: data.username,
         referredBy: data.referred_by,
         referralEarnings: data.referral_earnings || 0,
         totalReferredCount: data.total_referred_count || 0,
@@ -318,8 +326,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     // Supabase not configured হলে localStorage fallback (dev mode)
-    const saved = localStorage.getItem(`mailvault_user_${email.toLowerCase().trim()}`);
-    if (!saved) return { success: false, message: 'No account found with this email.' };
+    const saved = localStorage.getItem(`mailvault_user_${identifier.toLowerCase().trim()}`);
+    if (!saved) return { success: false, message: 'No account found.' };
     const savedUser = JSON.parse(saved);
     if (savedUser.password !== pass) return { success: false, message: 'Incorrect password.' };
 
@@ -329,28 +337,167 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true, message: 'Logged in successfully!' };
   };
 
+  const setupFirstAdmin = async (name: string, username: string, email: string, password: string) => {
+    if (!name || !username || !email || !password) {
+      return { success: false, message: 'Please fill all required fields.' };
+    }
+
+    const client = supabase;
+    if (isSupabaseConfigured && client) {
+      const trimmedEmail = email.toLowerCase().trim();
+      const trimmedUsername = username.trim().toLowerCase();
+
+      const { data: existingAdmin, error: adminCheckError } = await client
+        .from('profiles')
+        .select('id')
+        .eq('role', 'ADMIN')
+        .limit(1);
+
+      if (adminCheckError) {
+        console.error('Admin pre-check DB error:', adminCheckError);
+        return { success: false, message: `Database check failed: ${adminCheckError.message}` };
+      }
+
+      if (existingAdmin && existingAdmin.length > 0) {
+        return { success: false, message: 'Admin setup has already been completed.' };
+      }
+
+      const { data: existingEmail, error: emailCheckError } = await client
+        .from('profiles')
+        .select('id')
+        .eq('email', trimmedEmail)
+        .maybeSingle();
+
+      if (emailCheckError) {
+        console.error('Email check DB error:', emailCheckError);
+        return { success: false, message: `Database check failed: ${emailCheckError.message}` };
+      }
+
+      if (existingEmail) {
+        return { success: false, message: 'This email is already registered.' };
+      }
+
+      const { data: existingUsername, error: usernameCheckError } = await client
+        .from('profiles')
+        .select('id')
+        .eq('username', trimmedUsername)
+        .maybeSingle();
+
+      if (usernameCheckError) {
+        console.error('Username check DB error:', usernameCheckError);
+        return { success: false, message: `Database check failed: ${usernameCheckError.message}` };
+      }
+
+      if (existingUsername) {
+        return { success: false, message: 'This username is already taken.' };
+      }
+
+      const userId = `usr-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+      const { data, error } = await client
+        .from('profiles')
+        .insert({
+          id: userId,
+          name: name.trim(),
+          username: trimmedUsername,
+          email: trimmedEmail,
+          phone: '',
+          password: password,
+          role: 'ADMIN',
+          ref_code: '',
+          referred_by: null,
+          referral_earnings: 0,
+          total_referred_count: 0,
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Admin setup DB insert error:', error);
+        if (error.code === '23505') {
+          return { success: false, message: 'Username or email already exists. Please use different values.' };
+        }
+        return { success: false, message: `Setup failed: ${error.message}` };
+      }
+
+      const adminUser: UserProfile = {
+        id: data.id,
+        name: data.name,
+        email: data.email,
+        phone: data.phone || '',
+        role: 'ADMIN',
+        refCode: data.ref_code || '',
+        username: data.username,
+        referredBy: data.referred_by,
+        referralEarnings: 0,
+        totalReferredCount: 0,
+        createdAt: data.created_at
+      };
+
+      setCurrentUser(adminUser);
+      localStorage.setItem('mailvault_current_user', JSON.stringify(adminUser));
+      localStorage.setItem('mailvault_admin_initialized', 'true');
+      return { success: true, message: 'Admin account created successfully!' };
+    }
+
+    const adminUser: UserProfile = {
+      id: `admin-${Date.now()}`,
+      name: name.trim(),
+      username: username.trim().toLowerCase(),
+      email: email.toLowerCase().trim(),
+      phone: '',
+      role: 'ADMIN',
+      refCode: '',
+      referredBy: undefined,
+      referralEarnings: 0,
+      totalReferredCount: 0,
+      createdAt: new Date().toISOString()
+    };
+
+    setCurrentUser(adminUser);
+    localStorage.setItem('mailvault_current_user', JSON.stringify(adminUser));
+    localStorage.setItem('mailvault_admin_initialized', 'true');
+    return { success: true, message: 'Admin account created successfully!' };
+  };
+
   const registerUser = async (email: string, pass: string, name: string, phone: string) => {
     if (!email || !pass || !name || !phone) {
       return { success: false, message: 'Please fill all required fields.' };
     }
 
+    const trimmedEmail = email.toLowerCase().trim();
     const savedRefCode = localStorage.getItem('mailvault_ref_code') || undefined;
-    const userId = `usr-${Date.now()}`;
-    const refCode = `${name.toLowerCase().replace(/\s+/g, '')}${Math.floor(10 + Math.random() * 89)}`;
+    const userId = `usr-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    let refCode = `${name.toLowerCase().replace(/\s+/g, '')}${Math.floor(10 + Math.random() * 89)}`;
 
     const client = supabase;
 
-    // Supabase configured হলে database-এ save করো
     if (isSupabaseConfigured && client) {
-      // Email already exists check
       const { data: existing } = await client
         .from('profiles')
         .select('id')
-        .eq('email', email.toLowerCase().trim())
+        .eq('email', trimmedEmail)
         .maybeSingle();
 
       if (existing) {
         return { success: false, message: 'An account with this email already exists. Please login instead.' };
+      }
+
+      let refCodeAvailable = false;
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const { data: refTaken } = await client
+          .from('profiles')
+          .select('id')
+          .eq('ref_code', refCode)
+          .maybeSingle();
+
+        if (!refTaken) {
+          refCodeAvailable = true;
+          break;
+        }
+
+        refCode = `${name.toLowerCase().replace(/\s+/g, '')}${Math.floor(10 + Math.random() * 899)}`;
       }
 
       const { data, error } = await client
@@ -358,9 +505,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .insert({
           id: userId,
           name: name.trim(),
-          email: email.toLowerCase().trim(),
+          email: trimmedEmail,
           phone: phone.trim(),
-          password: pass, // stored as plain text for this custom auth system
+          password: pass,
           role: 'SELLER',
           ref_code: refCode,
           referred_by: savedRefCode || null,
@@ -374,7 +521,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (error) {
         console.error('Register DB error:', error);
         if (error.code === '23505') {
-          return { success: false, message: 'This email is already registered. Please login.' };
+          const message = error.message || '';
+          if (message.includes('ref_code')) {
+            return { success: false, message: 'Could not generate a unique referral code. Please try again.' };
+          }
+          if (message.includes('email')) {
+            return { success: false, message: 'This email is already registered. Please login.' };
+          }
+          return { success: false, message: 'A duplicate value was found. Please try again.' };
         }
         return { success: false, message: `Registration failed: ${error.message}` };
       }
@@ -397,8 +551,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: true, message: 'Seller account registered successfully!' };
     }
 
-    // Supabase not configured হলে localStorage fallback (dev mode)
-    const emailKey = `mailvault_user_${email.toLowerCase().trim()}`;
+    const emailKey = `mailvault_user_${trimmedEmail}`;
     if (localStorage.getItem(emailKey)) {
       return { success: false, message: 'An account with this email already exists.' };
     }
@@ -406,7 +559,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newUser: UserProfile = {
       id: userId,
       name: name.trim(),
-      email: email.toLowerCase().trim(),
+      email: trimmedEmail,
       phone: phone.trim(),
       role: 'SELLER',
       refCode,
@@ -735,11 +888,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         payoutMethods,
         addPayoutMethod,
         togglePayoutMethodStatus,
-        loginUser,
-        registerUser,
-        updateUserProfile,
-        logoutUser,
-        submitBatchEmails,
+         loginUser,
+         registerUser,
+         updateUserProfile,
+         logoutUser,
+         setupFirstAdmin,
+         submitBatchEmails,
         requestWithdrawal,
         updateCategoryRate,
         toggleCategoryStatus,

@@ -1,10 +1,6 @@
 -- ==========================================
--- MAILVAULT DIRECT EMAIL PROCUREMENT DATABASE SCHEMA
--- Execute this script in your Supabase SQL Editor
+-- Initial Schema + Seed + Auth + RLS
 -- ==========================================
-
--- Enable UUID extension
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- 1. CATEGORIES TABLE
 CREATE TABLE IF NOT EXISTS public.categories (
@@ -117,11 +113,79 @@ VALUES
 ON CONFLICT (id) DO NOTHING;
 
 -- ==========================================
--- ENABLE REALTIME PUBLICATION FOR ALL TABLES
+-- AUTH: add missing columns on existing tables
 -- ==========================================
-ALTER PUBLICATION supabase_realtime ADD TABLE public.categories;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.email_submissions;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.withdrawals;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.payout_methods;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.announcements;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.profiles;
+
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS password TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS username TEXT UNIQUE;
+
+-- ==========================================
+-- ENABLE REALTIME PUBLICATION FOR ALL TABLES
+DO $$
+BEGIN
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.categories;
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END;
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.email_submissions;
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END;
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.withdrawals;
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END;
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.payout_methods;
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END;
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.announcements;
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END;
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.profiles;
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END;
+END $$;
+
+-- ==========================================
+-- RLS: enable and apply policies
+-- ==========================================
+
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.email_submissions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.withdrawals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.payout_methods ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.announcements ENABLE ROW LEVEL SECURITY;
+
+-- profiles
+DROP POLICY IF EXISTS "Allow anon select profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Allow anon insert profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Allow anon update own profile" ON public.profiles;
+CREATE POLICY "Allow anon select profiles" ON public.profiles FOR SELECT TO anon USING (true);
+CREATE POLICY "Allow anon insert profiles" ON public.profiles FOR INSERT TO anon WITH CHECK (true);
+CREATE POLICY "Allow anon update own profile" ON public.profiles FOR UPDATE TO anon USING (true) WITH CHECK (true);
+
+-- categories
+DROP POLICY IF EXISTS "Allow anon read categories" ON public.categories;
+CREATE POLICY "Allow anon read categories" ON public.categories FOR ALL TO anon USING (true) WITH CHECK (true);
+
+-- email_submissions
+DROP POLICY IF EXISTS "Allow anon all email_submissions" ON public.email_submissions;
+CREATE POLICY "Allow anon all email_submissions" ON public.email_submissions FOR ALL TO anon USING (true) WITH CHECK (true);
+
+-- withdrawals
+DROP POLICY IF EXISTS "Allow anon all withdrawals" ON public.withdrawals;
+CREATE POLICY "Allow anon all withdrawals" ON public.withdrawals FOR ALL TO anon USING (true) WITH CHECK (true);
+
+-- payout_methods
+DROP POLICY IF EXISTS "Allow anon all payout_methods" ON public.payout_methods;
+CREATE POLICY "Allow anon all payout_methods" ON public.payout_methods FOR ALL TO anon USING (true) WITH CHECK (true);
+
+-- announcements
+DROP POLICY IF EXISTS "Allow anon all announcements" ON public.announcements;
+CREATE POLICY "Allow anon all announcements" ON public.announcements FOR ALL TO anon USING (true) WITH CHECK (true);
+
+-- Done!

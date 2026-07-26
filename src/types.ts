@@ -82,6 +82,7 @@ export interface UserProfile {
   phone: string;
   role: UserRole;
   refCode: string;
+  username?: string;
   referredBy?: string;
   referralEarnings: number;
   totalReferredCount: number;
