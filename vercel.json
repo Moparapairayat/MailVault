@@ -1,6 +1,6 @@
 {
   "framework": "vite",
-  "buildCommand": "chmod +x node_modules/.bin/tsc && npm run build",
+  "buildCommand": "npx --no-install tsc && npx --no-install vite build",
   "outputDirectory": "dist",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
