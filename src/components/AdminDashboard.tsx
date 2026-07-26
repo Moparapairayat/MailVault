@@ -191,25 +191,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLockVault }) =
       <main className="flex-1 py-6 px-3 sm:px-6 lg:px-8 max-w-7xl mx-auto overflow-x-hidden pb-24 md:pb-12">
         
         {/* Top Banner Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 bg-gradient-to-r from-accent-purple/20 via-dark-card to-dark-card p-6 rounded-3xl border border-accent-purple/30">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-accent-purple/20 border border-accent-purple/40 flex items-center justify-center text-accent-purple">
-              <Shield className="w-7 h-7" />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8 bg-gradient-to-r from-accent-purple/20 via-dark-card to-dark-card p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-accent-purple/30">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-accent-purple/20 border border-accent-purple/40 flex items-center justify-center text-accent-purple shrink-0">
+              <Shield className="w-6 h-6 sm:w-7 sm:h-7" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-black text-white">Admin Control Vault</h1>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-xl sm:text-2xl font-black text-white">Admin Control Vault</h1>
                 <span className="px-2.5 py-0.5 text-[10px] font-bold uppercase bg-amber-400/10 text-amber-400 border border-amber-400/30 rounded-full">
                   Super Admin
                 </span>
               </div>
-              <p className="text-xs text-slate-300">Set buying prices, verify seller bulk submissions, and export clean TXT email vault.</p>
+              <p className="text-xs text-slate-300 mt-0.5">Set buying prices, verify seller bulk submissions, and export clean TXT email vault.</p>
             </div>
           </div>
 
           <button
             onClick={() => exportApprovedEmails(selectedCategoryId === 'ALL' ? undefined : selectedCategoryId as CategoryId)}
-            className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-6 py-3.5 rounded-2xl text-xs transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-2 self-start md:self-auto cursor-pointer"
+            className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-4 sm:px-6 py-3 sm:py-3.5 rounded-xl sm:rounded-2xl text-xs transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-2 self-stretch sm:self-auto justify-center cursor-pointer"
           >
             <Download className="w-4 h-4" />
             <span>Export Approved TXT Vault</span>
@@ -720,7 +720,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLockVault }) =
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full text-left border-collapse min-w-[700px]">
                 <thead>
                   <tr className="bg-dark-panel/60 border-b border-dark-border text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
                     <th className="py-3.5 px-4 w-10">

@@ -6,7 +6,7 @@ export const Footer: React.FC = () => {
     <footer className="bg-dark-bg border-t border-dark-border py-12 text-slate-400 text-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 mb-8 pb-20 sm:pb-0">
           
           {/* Col 1: Brand Info */}
           <div className="space-y-3">

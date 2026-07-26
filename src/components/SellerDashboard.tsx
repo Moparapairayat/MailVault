@@ -165,6 +165,23 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({ openSubmitModa
   const telegramUrl = `https://t.me/share/url?url=${encodeURIComponent(refLink)}&text=${shareText}`;
   const facebookUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(refLink)}`;
 
+  // Secondary guard — extra protection
+  if (!currentUser) {
+    return (
+      <div className="min-h-[70vh] flex flex-col items-center justify-center gap-5 text-center px-6">
+        <div className="w-20 h-20 rounded-3xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center mx-auto">
+          <span className="text-4xl">🔐</span>
+        </div>
+        <div>
+          <h2 className="text-2xl font-black text-white mb-2">Seller Portal — Login Required</h2>
+          <p className="text-sm text-slate-400 max-w-sm mx-auto">
+            এই পেজটি শুধুমাত্র Registered Seller-দের জন্য। আপনার account-এ Login করুন।
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col md:flex-row min-h-[calc(100vh-5rem)]">
       
@@ -782,8 +799,8 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({ openSubmitModa
 
       {/* Withdrawal Request Modal Popup */}
       {isWithdrawOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="glass-card w-full max-w-md rounded-3xl border border-brand-500/30 p-6 shadow-2xl bg-dark-card">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="glass-card w-full max-w-md sm:rounded-3xl rounded-t-3xl border border-brand-500/30 p-6 shadow-2xl bg-dark-card max-h-[92vh] overflow-y-auto">
             
             <div className="flex items-center justify-between pb-4 border-b border-dark-border mb-4">
               <h3 className="font-bold text-lg text-white">Withdraw Funds</h3>

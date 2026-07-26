@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AppProvider } from './context/AppContext';
+import { AppProvider, useApp } from './context/AppContext';
 import { Navbar } from './components/Navbar';
 import { LiveTicker } from './components/LiveTicker';
 import { HeroSection } from './components/HeroSection';
@@ -13,7 +13,33 @@ import { Footer } from './components/Footer';
 import { LiveSupportWidget } from './components/LiveSupportWidget';
 import { CategoryId } from './types';
 
+// Auth Guard — Login ছাড়া Seller Dashboard access করলে redirect + modal
+interface LoginRedirectProps {
+  navigate: (path: string) => void;
+  openAuthModal: (mode: 'LOGIN' | 'SIGNUP') => void;
+}
+
+const LoginRedirect: React.FC<LoginRedirectProps> = ({ navigate, openAuthModal }) => {
+  useEffect(() => {
+    // Home page-এ ফেরত পাঠাও এবং Login modal খোলো
+    navigate('/');
+    openAuthModal('LOGIN');
+  }, []);
+
+  // Loading state দেখাও redirect হওয়ার আগ পর্যন্ত
+  return (
+    <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4 text-center px-4">
+      <div className="w-16 h-16 rounded-2xl bg-brand-500/20 border border-brand-500/40 flex items-center justify-center mx-auto animate-pulse">
+        <span className="text-3xl">🔒</span>
+      </div>
+      <h2 className="text-xl font-bold text-white">Login Required</h2>
+      <p className="text-sm text-slate-400">Seller Dashboard দেখতে প্রথমে Login করুন।</p>
+    </div>
+  );
+};
+
 const MainLayout: React.FC = () => {
+  const { currentUser } = useApp();
   // Client Path Routing
   const [currentPath, setCurrentPath] = useState<string>(() => window.location.pathname);
   const [isAdminUnlocked, setIsAdminUnlocked] = useState<boolean>(() => {
@@ -84,7 +110,15 @@ const MainLayout: React.FC = () => {
             />
           )
         ) : currentPath === '/seller' || currentPath === '/dashboard' ? (
-          <SellerDashboard openSubmitModal={() => handleOpenSubmitModal()} />
+          currentUser ? (
+            <SellerDashboard openSubmitModal={() => handleOpenSubmitModal()} />
+          ) : (
+            // Not logged in → redirect to home & open login modal
+            <LoginRedirect
+              navigate={navigate}
+              openAuthModal={handleOpenAuthModal}
+            />
+          )
         ) : (
           <main>
             <HeroSection onStartSell={() => handleOpenSubmitModal()} />
@@ -98,6 +132,7 @@ const MainLayout: React.FC = () => {
         isOpen={isSubmitModalOpen}
         onClose={() => setIsSubmitModalOpen(false)}
         defaultCategoryId={selectedSubmitCategory}
+        openAuthModal={handleOpenAuthModal}
       />
 
       {/* Global Auth Modal */}
@@ -105,6 +140,7 @@ const MainLayout: React.FC = () => {
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
         initialMode={authMode}
+        onSuccess={() => navigate('/seller')}
       />
 
       {/* Public Footer (Only rendered on Home page) */}

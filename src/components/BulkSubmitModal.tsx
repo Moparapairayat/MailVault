@@ -7,10 +7,11 @@ interface BulkSubmitModalProps {
   isOpen: boolean;
   onClose: () => void;
   defaultCategoryId?: CategoryId;
+  openAuthModal?: (mode: 'LOGIN' | 'SIGNUP') => void;
 }
 
-export const BulkSubmitModal: React.FC<BulkSubmitModalProps> = ({ isOpen, onClose, defaultCategoryId }) => {
-  const { categories, submitBatchEmails } = useApp();
+export const BulkSubmitModal: React.FC<BulkSubmitModalProps> = ({ isOpen, onClose, defaultCategoryId, openAuthModal }) => {
+  const { categories, submitBatchEmails, currentUser } = useApp();
 
   const [mode, setMode] = useState<'SINGLE' | 'BULK'>('SINGLE');
   const [selectedCategory, setSelectedCategory] = useState<CategoryId>(defaultCategoryId || 'gmail_fresh');
@@ -29,6 +30,35 @@ export const BulkSubmitModal: React.FC<BulkSubmitModalProps> = ({ isOpen, onClos
   const [verifyStepText, setVerifyStepText] = useState('');
 
   if (!isOpen) return null;
+
+  // Login guard — not logged in হলে login prompt দেখাও
+  if (!currentUser) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+        <div className="glass-card w-full max-w-md sm:rounded-3xl rounded-t-3xl border border-brand-500/30 p-6 sm:p-8 shadow-2xl bg-dark-card text-center">
+          <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center mx-auto mb-4">
+            <span className="text-3xl">🔒</span>
+          </div>
+          <h2 className="text-xl font-bold text-white mb-2">Login Required</h2>
+          <p className="text-sm text-slate-400 mb-6">Email sell করতে প্রথমে আপনার Seller account-এ Login করুন।</p>
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              className="flex-1 py-2.5 rounded-xl text-xs font-semibold text-slate-400 bg-dark-panel hover:bg-dark-hover border border-dark-border"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => { onClose(); openAuthModal?.('LOGIN'); }}
+              className="flex-1 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-brand-500 to-accent-cyan text-slate-950 shadow-md"
+            >
+              Login / Sign Up
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const currentCategoryObj = categories.find(c => c.id === selectedCategory) || categories[0];
 
@@ -94,9 +124,9 @@ seller.test.mail03@gmail.com:Pass1234Secure!:recovery3@mail.com`;
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
       
-      <div className="glass-card w-full max-w-2xl rounded-3xl border border-brand-500/30 p-6 sm:p-8 relative shadow-2xl bg-dark-card overflow-hidden">
+      <div className="glass-card w-full max-w-2xl sm:rounded-3xl rounded-t-3xl border border-brand-500/30 p-5 sm:p-8 relative shadow-2xl bg-dark-card overflow-hidden max-h-[92vh] sm:max-h-[90vh] overflow-y-auto">
         
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-dark-border mb-4">

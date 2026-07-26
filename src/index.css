@@ -3,12 +3,17 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    overflow-x: hidden;
+  }
   body {
     @apply bg-[#070A12] text-slate-100 font-sans selection:bg-emerald-500 selection:text-white antialiased min-h-screen;
     background-image: 
       radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.07) 0px, transparent 50%),
       radial-gradient(at 100% 0%, rgba(6, 182, 212, 0.07) 0px, transparent 50%),
       radial-gradient(at 50% 100%, rgba(168, 85, 247, 0.04) 0px, transparent 50%);
+    overflow-x: hidden;
+    -webkit-tap-highlight-color: transparent;
   }
 }
 
@@ -64,4 +69,30 @@
 }
 .animate-marquee:hover {
   animation-play-state: paused;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+/* Mobile sheet animation */
+@media (max-width: 639px) {
+  .animate-fade-in > div {
+    animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+}
+
+/* Safe area insets for iPhone notch / home bar */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }

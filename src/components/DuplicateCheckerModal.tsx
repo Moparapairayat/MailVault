@@ -33,8 +33,8 @@ export const DuplicateCheckerModal: React.FC<DuplicateCheckerModalProps> = ({ is
   const cleanCount = checkedResults ? checkedResults.filter(r => !r.isDuplicate).length : 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
-      <div className="glass-card w-full max-w-xl rounded-3xl border border-brand-500/30 p-6 sm:p-8 shadow-2xl bg-dark-card">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+      <div className="glass-card w-full max-w-xl sm:rounded-3xl rounded-t-3xl border border-brand-500/30 p-5 sm:p-8 shadow-2xl bg-dark-card max-h-[90vh] overflow-y-auto">
         
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-dark-border mb-4">

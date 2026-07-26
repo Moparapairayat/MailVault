@@ -68,31 +68,32 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate, openSubmi
           </nav>
 
           {/* Right Action Controls */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3">
             
             {/* Seller Balance Pill with 1-Click Withdraw Cashout */}
             {currentUser && currentPath !== '/admin' && (
               <div
                 onClick={() => navigate('/seller')}
-                className="flex items-center gap-2 bg-dark-card hover:bg-dark-hover px-3 py-1.5 rounded-xl border border-dark-border text-xs cursor-pointer group transition-all"
+                className="flex items-center gap-1.5 sm:gap-2 bg-dark-card hover:bg-dark-hover px-2 sm:px-3 py-1.5 rounded-xl border border-dark-border text-xs cursor-pointer group transition-all"
                 title="Click to open Seller Dashboard & Withdraw Cash"
               >
-                <Wallet className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-all" />
-                <div>
-                  <span className="text-slate-400 block text-[9px] leading-tight">Ready Cash</span>
-                  <span className="font-extrabold text-emerald-400 text-xs sm:text-sm">৳{availableBalance}</span>
+                <Wallet className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-all shrink-0" />
+                <div className="hidden xs:block sm:block">
+                  <span className="text-slate-400 block text-[9px] leading-tight">Cash</span>
+                  <span className="font-extrabold text-emerald-400 text-xs">৳{availableBalance}</span>
                 </div>
+                <span className="font-extrabold text-emerald-400 text-xs xs:hidden sm:hidden">৳{availableBalance}</span>
               </div>
             )}
 
             {/* Language Switcher Toggle */}
             <button
               onClick={() => setLang(lang === 'en' ? 'bn' : 'en')}
-              className="bg-dark-card hover:bg-dark-hover border border-dark-border px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-300 flex items-center gap-1.5 transition-all"
+              className="bg-dark-card hover:bg-dark-hover border border-dark-border px-2 sm:px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-300 flex items-center gap-1 sm:gap-1.5 transition-all"
               title="Switch Language (English / বাংলা)"
             >
               <Globe className="w-3.5 h-3.5 text-brand-400" />
-              <span>{lang === 'en' ? 'EN' : 'বাংলা'}</span>
+              <span className="hidden sm:inline">{lang === 'en' ? 'EN' : 'বাংলা'}</span>
             </button>
 
             {/* Anti-Duplicate Pre-Checker Button */}
@@ -124,7 +125,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate, openSubmi
                   className="flex items-center gap-2 bg-dark-card px-3 py-1.5 rounded-xl border border-dark-border text-xs cursor-pointer hover:border-brand-500/50 transition-all"
                 >
                   <User className="w-3.5 h-3.5 text-brand-400" />
-                  <span className="font-bold text-white max-w-[100px] truncate">{currentUser.name}</span>
+                  <span className="font-bold text-white max-w-[80px] md:max-w-[100px] truncate">{currentUser.name}</span>
                 </div>
                 <button
                   onClick={logoutUser}
@@ -137,10 +138,10 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate, openSubmi
             ) : (
               <button
                 onClick={() => openAuthModal('LOGIN')}
-                className="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-md shadow-brand-500/20 transition-all"
+                className="flex bg-brand-500 hover:bg-brand-600 text-white px-2 sm:px-4 py-2 rounded-xl text-xs font-bold items-center gap-1.5 sm:gap-2 shadow-md shadow-brand-500/20 transition-all"
               >
                 <LogIn className="w-3.5 h-3.5" />
-                <span>Login / Sign Up</span>
+                <span className="hidden sm:inline">Login</span>
               </button>
             )}
 

@@ -275,20 +275,57 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const loginUser = async (email: string, pass: string) => {
     if (!email || !pass) return { success: false, message: 'Please enter email and password.' };
 
-    const username = email.split('@')[0];
-    const newUser: UserProfile = {
-      id: `usr-${username}`,
-      name: username.toUpperCase(),
-      email,
-      phone: '01700000000',
-      role: 'SELLER',
-      refCode: `${username}${Math.floor(10 + Math.random() * 89)}`,
-      referralEarnings: 0,
-      totalReferredCount: 0,
-      createdAt: new Date().toISOString()
-    };
+    const client = supabase;
 
-    setCurrentUser(newUser);
+    // Supabase configured হলে database থেকে verify করো
+    if (isSupabaseConfigured && client) {
+      const { data, error } = await client
+        .from('profiles')
+        .select('*')
+        .eq('email', email.toLowerCase().trim())
+        .eq('password', pass)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Login DB error:', error);
+        return { success: false, message: 'Database error. Please try again.' };
+      }
+
+      if (!data) {
+        return { success: false, message: 'Invalid email or password. Please check and try again.' };
+      }
+
+      const user: UserProfile = {
+        id: data.id,
+        name: data.name,
+        email: data.email,
+        phone: data.phone || '',
+        role: data.role || 'SELLER',
+        refCode: data.ref_code || '',
+        referredBy: data.referred_by,
+        referralEarnings: data.referral_earnings || 0,
+        totalReferredCount: data.total_referred_count || 0,
+        defaultBkash: data.default_bkash,
+        defaultNagad: data.default_nagad,
+        defaultRocket: data.default_rocket,
+        defaultUsdt: data.default_usdt,
+        createdAt: data.created_at
+      };
+
+      setCurrentUser(user);
+      localStorage.setItem('mailvault_current_user', JSON.stringify(user));
+      return { success: true, message: 'Logged in successfully!' };
+    }
+
+    // Supabase not configured হলে localStorage fallback (dev mode)
+    const saved = localStorage.getItem(`mailvault_user_${email.toLowerCase().trim()}`);
+    if (!saved) return { success: false, message: 'No account found with this email.' };
+    const savedUser = JSON.parse(saved);
+    if (savedUser.password !== pass) return { success: false, message: 'Incorrect password.' };
+
+    const { password: _, ...userWithoutPass } = savedUser;
+    setCurrentUser(userWithoutPass);
+    localStorage.setItem('mailvault_current_user', JSON.stringify(userWithoutPass));
     return { success: true, message: 'Logged in successfully!' };
   };
 
@@ -298,21 +335,90 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     const savedRefCode = localStorage.getItem('mailvault_ref_code') || undefined;
+    const userId = `usr-${Date.now()}`;
+    const refCode = `${name.toLowerCase().replace(/\s+/g, '')}${Math.floor(10 + Math.random() * 89)}`;
+
+    const client = supabase;
+
+    // Supabase configured হলে database-এ save করো
+    if (isSupabaseConfigured && client) {
+      // Email already exists check
+      const { data: existing } = await client
+        .from('profiles')
+        .select('id')
+        .eq('email', email.toLowerCase().trim())
+        .maybeSingle();
+
+      if (existing) {
+        return { success: false, message: 'An account with this email already exists. Please login instead.' };
+      }
+
+      const { data, error } = await client
+        .from('profiles')
+        .insert({
+          id: userId,
+          name: name.trim(),
+          email: email.toLowerCase().trim(),
+          phone: phone.trim(),
+          password: pass, // stored as plain text for this custom auth system
+          role: 'SELLER',
+          ref_code: refCode,
+          referred_by: savedRefCode || null,
+          referral_earnings: 0,
+          total_referred_count: 0,
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Register DB error:', error);
+        if (error.code === '23505') {
+          return { success: false, message: 'This email is already registered. Please login.' };
+        }
+        return { success: false, message: `Registration failed: ${error.message}` };
+      }
+
+      const newUser: UserProfile = {
+        id: data.id,
+        name: data.name,
+        email: data.email,
+        phone: data.phone || '',
+        role: 'SELLER',
+        refCode: data.ref_code || refCode,
+        referredBy: data.referred_by,
+        referralEarnings: 0,
+        totalReferredCount: 0,
+        createdAt: data.created_at
+      };
+
+      setCurrentUser(newUser);
+      localStorage.setItem('mailvault_current_user', JSON.stringify(newUser));
+      return { success: true, message: 'Seller account registered successfully!' };
+    }
+
+    // Supabase not configured হলে localStorage fallback (dev mode)
+    const emailKey = `mailvault_user_${email.toLowerCase().trim()}`;
+    if (localStorage.getItem(emailKey)) {
+      return { success: false, message: 'An account with this email already exists.' };
+    }
 
     const newUser: UserProfile = {
-      id: `usr-${Date.now()}`,
-      name,
-      email,
-      phone,
+      id: userId,
+      name: name.trim(),
+      email: email.toLowerCase().trim(),
+      phone: phone.trim(),
       role: 'SELLER',
-      refCode: `${name.toLowerCase().replace(/\s+/g, '')}${Math.floor(10 + Math.random() * 89)}`,
+      refCode,
       referredBy: savedRefCode,
       referralEarnings: 0,
       totalReferredCount: 0,
       createdAt: new Date().toISOString()
     };
 
+    localStorage.setItem(emailKey, JSON.stringify({ ...newUser, password: pass }));
     setCurrentUser(newUser);
+    localStorage.setItem('mailvault_current_user', JSON.stringify(newUser));
     return { success: true, message: 'Seller account registered successfully!' };
   };
 
@@ -330,14 +436,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Wallet Calculations for Current Seller
-  const sellerId = currentUser ? currentUser.id : 'usr-seller-1';
-  const mySubmissions = submissions.filter(s => s.sellerId === sellerId);
-  const myWithdrawals = withdrawals.filter(w => w.sellerId === sellerId);
+  const sellerId = currentUser ? currentUser.id : null;
+  const mySubmissions = sellerId ? submissions.filter(s => s.sellerId === sellerId) : [];
+  const myWithdrawals = sellerId ? withdrawals.filter(w => w.sellerId === sellerId) : [];
 
   const approvedItems = mySubmissions.filter(s => s.status === 'APPROVED');
   const pendingItems = mySubmissions.filter(s => s.status === 'PENDING');
   
-  const referralBonus = currentUser ? (currentUser.referralEarnings || 0) : 150;
+  const referralBonus = currentUser ? (currentUser.referralEarnings || 0) : 0;
   const totalApprovedEarnings = approvedItems.reduce((acc, curr) => acc + curr.rate, 0) + referralBonus;
   const pendingBalance = pendingItems.reduce((acc, curr) => acc + curr.rate, 0);
 
@@ -367,6 +473,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Submit Batch Emails
   const submitBatchEmails = async (categoryId: CategoryId, rawText: string) => {
+    // Auth guard — login ছাড়া submit করা যাবে না
+    if (!currentUser) {
+      return { success: false, added: 0, duplicates: 0, message: 'Please login to submit emails.' };
+    }
+
     const category = categories.find(c => c.id === categoryId);
     if (!category) return { success: false, added: 0, duplicates: 0, message: 'Invalid category' };
     if (category.status === 'PAUSED') {
@@ -384,7 +495,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let duplicateCount = 0;
     const batchId = `BATCH-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    const currentSellerName = currentUser ? currentUser.name : 'Karim Ahmed';
+    const currentSellerName = currentUser.name;
+    const currentSellerId = currentUser.id;
 
     for (const line of lines) {
       const parts = line.split(/[:,\s|\t]+/);
@@ -405,7 +517,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const itemObj: EmailItem = {
         id: itemId,
         batchId,
-        sellerId,
+        sellerId: currentSellerId,
         sellerName: currentSellerName,
         categoryId,
         email,
@@ -420,7 +532,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       dbPayloads.push({
         id: itemId,
         batch_id: batchId,
-        seller_id: sellerId,
+        seller_id: currentSellerId,
         seller_name: currentSellerName,
         category_id: categoryId,
         email,
@@ -477,17 +589,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Request Withdrawal
   const requestWithdrawal = async (amount: number, method: PaymentMethod, accountDetails: string) => {
+    // Auth guard — login ছাড়া withdrawal করা যাবে না
+    if (!currentUser) return { success: false, message: 'Please login to request withdrawal.' };
     if (amount <= 0) return { success: false, message: 'Amount must be greater than 0.' };
     if (amount > availableBalance) return { success: false, message: 'Insufficient available balance.' };
     if (amount < 100) return { success: false, message: 'Minimum withdrawal amount is ৳100.' };
     if (!accountDetails.trim()) return { success: false, message: 'Please provide account number/address.' };
 
     const reqId = `wd-${Date.now()}`;
-    const currentSellerName = currentUser ? currentUser.name : 'Karim Ahmed';
+    const currentSellerName = currentUser.name;
+    const currentSellerId = currentUser.id;
 
     const newReq: WithdrawalRequest = {
       id: reqId,
-      sellerId,
+      sellerId: currentSellerId,
       sellerName: currentSellerName,
       amount,
       method,
@@ -500,7 +615,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (isSupabaseConfigured && client) {
       await client.from('withdrawals').insert({
         id: reqId,
-        seller_id: sellerId,
+        seller_id: currentSellerId,
         seller_name: currentSellerName,
         amount,
         method,

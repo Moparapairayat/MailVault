@@ -12,7 +12,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onStartSell }) => {
   const totalActiveCategories = categories.filter(c => c.status === 'ACTIVE').length;
 
   return (
-    <div className="relative overflow-hidden pt-12 pb-16 border-b border-dark-border/50">
+    <div className="relative overflow-hidden pt-8 sm:pt-12 pb-20 sm:pb-16 border-b border-dark-border/50">
       
       {/* Background Radial Glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-brand-500/10 blur-[120px] rounded-full pointer-events-none" />
@@ -22,13 +22,14 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onStartSell }) => {
         <div className="text-center max-w-3xl mx-auto">
           
           {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-brand-500/10 border border-brand-500/30 text-brand-400 text-xs font-semibold mb-6 shadow-sm">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>Direct Admin Procurement Portal • Guaranteed Payout</span>
+          <div className="inline-flex items-center gap-2 px-3 sm:px-3.5 py-1.5 rounded-full bg-brand-500/10 border border-brand-500/30 text-brand-400 text-[10px] sm:text-xs font-semibold mb-5 sm:mb-6 shadow-sm">
+            <ShieldCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" />
+            <span className="hidden sm:inline">Direct Admin Procurement Portal • Guaranteed Payout</span>
+            <span className="sm:hidden">Guaranteed Payout • Instant Cash</span>
           </div>
 
           {/* Heading */}
-          <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-white leading-tight font-sans">
+          <h1 className="text-3xl xs:text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-tight font-sans">
             Sell Your Emails <br className="hidden sm:block"/>
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-400 via-accent-cyan to-accent-emerald">
               Directly To Us
@@ -36,8 +37,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onStartSell }) => {
           </h1>
 
           {/* Subtitle */}
-          <p className="mt-5 text-lg text-slate-300 leading-relaxed">
-            We purchase verified <strong className="text-emerald-400">Gmail, Old Gmail, Edu Mail & Outlook</strong> accounts in bulk. Upload your file, get auto-verified by Admin, and cash out instantly via <strong className="text-white">bKash, Nagad & Crypto</strong>.
+          <p className="mt-4 sm:mt-5 text-sm sm:text-lg text-slate-300 leading-relaxed">
+            We purchase verified <strong className="text-emerald-400">Gmail, Old Gmail, Edu Mail &amp; Outlook</strong> accounts in bulk. Upload your file, get auto-verified by Admin, and cash out instantly via <strong className="text-white">bKash, Nagad &amp; Crypto</strong>.
           </p>
 
           {/* CTAs */}
@@ -60,7 +61,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onStartSell }) => {
           </div>
 
           {/* Trust Highlights */}
-          <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-4 text-left">
+          <div className="mt-8 sm:mt-12 grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 text-left">
             <div className="glass-card p-4 rounded-xl border border-dark-border">
               <div className="flex items-center gap-2 text-slate-400 text-xs font-semibold uppercase tracking-wider mb-1">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400" />

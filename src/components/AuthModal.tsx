@@ -6,9 +6,10 @@ interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialMode?: 'LOGIN' | 'SIGNUP';
+  onSuccess?: () => void;
 }
 
-export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'LOGIN' }) => {
+export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'LOGIN', onSuccess }) => {
   const { loginUser, registerUser } = useApp();
 
   const [mode, setMode] = useState<'LOGIN' | 'SIGNUP'>(initialMode);
@@ -27,11 +28,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMo
     if (mode === 'LOGIN') {
       const res = await loginUser(email, password);
       if (res.success) {
-        setNotice({ success: true, message: 'Logged in successfully!' });
+        setNotice({ success: true, message: 'Logged in! Redirecting to dashboard...' });
         setTimeout(() => {
           onClose();
           setNotice(null);
-        }, 1200);
+          onSuccess?.(); // navigate to /seller
+        }, 900);
       } else {
         setNotice({ success: false, message: res.message });
       }
@@ -41,11 +43,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMo
 
       const res = await registerUser(email, password, name, phone);
       if (res.success) {
-        setNotice({ success: true, message: 'Account created successfully!' });
+        setNotice({ success: true, message: 'Account created! Redirecting to dashboard...' });
         setTimeout(() => {
           onClose();
           setNotice(null);
-        }, 1200);
+          onSuccess?.(); // navigate to /seller
+        }, 900);
       } else {
         setNotice({ success: false, message: res.message });
       }
@@ -53,8 +56,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMo
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
-      <div className="glass-card w-full max-w-md rounded-3xl border border-brand-500/30 p-6 sm:p-8 relative shadow-2xl bg-dark-card overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+      <div className="glass-card w-full max-w-md sm:rounded-3xl rounded-t-3xl border border-brand-500/30 p-6 sm:p-8 relative shadow-2xl bg-dark-card overflow-hidden max-h-[95vh] sm:max-h-none overflow-y-auto">
         
         {/* Header Close */}
         <div className="flex items-center justify-between pb-4 border-b border-dark-border mb-6">

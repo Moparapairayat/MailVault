@@ -27,15 +27,15 @@ export const RateCard: React.FC<RateCardProps> = ({ onSelectCategoryToSell }) =>
   };
 
   return (
-    <section id="pricing" className="py-16 border-b border-dark-border">
+    <section id="pricing" className="py-12 sm:py-16 pb-28 sm:pb-20 border-b border-dark-border">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Section Header */}
-        <div className="text-center max-w-2xl mx-auto mb-12">
-          <h2 className="text-3xl font-extrabold text-white tracking-tight">
+        <div className="text-center max-w-2xl mx-auto mb-8 sm:mb-12">
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
             Today's <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-400 to-accent-cyan">Buying Rate Sheet</span>
           </h2>
-          <p className="mt-3 text-slate-400">
+          <p className="mt-3 text-sm sm:text-base text-slate-400">
             Prices are updated daily by Admin based on market demand. No hidden fees or commissions.
           </p>
         </div>
@@ -118,18 +118,18 @@ export const RateCard: React.FC<RateCardProps> = ({ onSelectCategoryToSell }) =>
         </div>
 
         {/* Interactive Earnings Calculator Box */}
-        <div className="mt-16 glass-card p-8 rounded-3xl border border-brand-500/30 bg-gradient-to-r from-dark-card via-dark-panel to-dark-card shadow-2xl">
-          <div className="flex items-center gap-3 mb-6">
+        <div className="mt-10 sm:mt-16 glass-card p-5 sm:p-8 rounded-2xl sm:rounded-3xl border border-brand-500/30 bg-gradient-to-r from-dark-card via-dark-panel to-dark-card shadow-2xl">
+          <div className="flex items-center gap-3 mb-5 sm:mb-6">
             <div className="w-10 h-10 rounded-xl bg-brand-500/20 border border-brand-500/40 flex items-center justify-center text-brand-400">
               <Calculator className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-white">Live Earnings Calculator</h3>
+              <h3 className="text-lg sm:text-xl font-bold text-white">Live Earnings Calculator</h3>
               <p className="text-xs text-slate-400">Calculate how much cash you will receive for your bulk emails</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 items-start lg:items-center">
             
             {/* Category Select */}
             <div>
@@ -161,10 +161,10 @@ export const RateCard: React.FC<RateCardProps> = ({ onSelectCategoryToSell }) =>
             </div>
 
             {/* Total Result Box */}
-            <div className="bg-brand-500/10 border border-brand-500/40 p-4 rounded-2xl flex items-center justify-between">
+            <div className="bg-brand-500/10 border border-brand-500/40 p-4 rounded-2xl flex items-center justify-between sm:col-span-2 lg:col-span-1">
               <div>
                 <span className="text-xs text-slate-400 block font-medium">Estimated Total Payout</span>
-                <span className="text-3xl font-black text-emerald-400">৳{calculatedEarnings.toLocaleString()}</span>
+                <span className="text-2xl sm:text-3xl font-black text-emerald-400">৳{calculatedEarnings.toLocaleString()}</span>
               </div>
 
               <button
