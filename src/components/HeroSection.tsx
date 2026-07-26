@@ -70,13 +70,13 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onStartSell }) => {
               <p className="text-xl font-bold text-white">{totalActiveCategories} Categories Active</p>
             </div>
 
-            <div className="glass-card p-4 rounded-xl border border-dark-border">
-              <div className="flex items-center gap-2 text-slate-400 text-xs font-semibold uppercase tracking-wider mb-1">
-                <Mail className="w-4 h-4 text-accent-cyan" />
-                <span>Total Purchased</span>
+              <div className="glass-card p-4 rounded-xl border border-dark-border">
+                <div className="flex items-center gap-2 text-slate-400 text-xs font-semibold uppercase tracking-wider mb-1">
+                  <Mail className="w-4 h-4 text-accent-cyan" />
+                  <span>Total Purchased</span>
+                </div>
+                <p className="text-xl font-bold text-white">{totalEmailsBought.toLocaleString()} Mails</p>
               </div>
-              <p className="text-xl font-bold text-white">{(totalEmailsBought + 63500).toLocaleString()} Mails</p>
-            </div>
 
             <div className="glass-card p-4 rounded-xl border border-dark-border">
               <div className="flex items-center gap-2 text-slate-400 text-xs font-semibold uppercase tracking-wider mb-1">

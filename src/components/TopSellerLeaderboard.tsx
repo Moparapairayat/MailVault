@@ -6,10 +6,9 @@ export const TopSellerLeaderboard: React.FC = () => {
   const { submissions } = useApp();
 
   // Calculate leaderboard from real Supabase submissions data
-  const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const weeklySubmissions = submissions.filter(s => s.status === 'APPROVED' && s.submittedAt >= oneWeekAgo);
+  const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const weeklySubmissions = submissions.filter(s => s.status === 'APPROVED' && new Date(s.submittedAt) >= oneWeekAgo);
 
-  // Aggregate by seller
   const sellerMap: Record<string, { name: string; count: number; earned: number }> = {};
   for (const s of weeklySubmissions) {
     if (!sellerMap[s.sellerId]) {
@@ -29,9 +28,9 @@ export const TopSellerLeaderboard: React.FC = () => {
       earned: seller.earned,
       tier:
         i === 0 ? '🥇 Gold VIP' :
-        i === 1 ? '🥇 Gold VIP' :
-        i === 2 ? '🥈 Silver' :
-        i === 3 ? '🥈 Silver' : '🥉 Bronze',
+        i <= 1 ? '🥈 Silver' :
+        i <= 3 ? '🥉 Bronze' :
+                  '🥉 Bronze',
       badgeColor:
         i === 0 ? 'border-amber-400/40 bg-amber-500/10 text-amber-400' :
         i === 1 ? 'border-slate-300/40 bg-slate-400/10 text-slate-300' :

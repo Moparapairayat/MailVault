@@ -251,7 +251,7 @@ seller.test.mail03@gmail.com:Pass1234Secure!:recovery3@mail.com`;
                 <div className="relative">
                   <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
-                    type="text"
+                    type="password"
                     placeholder="e.g. Pass1234Secure!"
                     value={singlePassword}
                     onChange={(e) => setSinglePassword(e.target.value)}

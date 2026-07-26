@@ -92,6 +92,10 @@ export interface UserProfile {
   defaultNagad?: string;
   defaultRocket?: string;
   defaultUsdt?: string;
+  // User Management
+  isBanned?: boolean;
+  bannedReason?: string;
+  lastLoginAt?: string;
 }
 
 export interface AnnouncementNotice {
@@ -99,5 +103,25 @@ export interface AnnouncementNotice {
   text: string;
   type: 'INFO' | 'BONUS' | 'WARNING';
   active: boolean;
+  createdAt: string;
+}
+
+export interface SellerActivityLog {
+  id: string;
+  sellerId: string;
+  sellerName: string;
+  actionType: 'LOGIN' | 'SUBMISSION' | 'WITHDRAWAL_REQUEST' | 'PROFILE_UPDATE';
+  details: string;
+  createdAt: string;
+}
+
+export interface AdminActivityLog {
+  id: string;
+  adminId: string;
+  adminName: string;
+  actionType: 'USER_ROLE_CHANGE' | 'USER_BAN' | 'USER_UNBAN' | 'USER_DELETE' | 'PASSWORD_RESET' | 'SUBMISSION_REVIEW' | 'WITHDRAWAL_PROCESS' | 'CATEGORY_UPDATE';
+  targetUserId?: string;
+  targetUserName?: string;
+  details: string;
   createdAt: string;
 }

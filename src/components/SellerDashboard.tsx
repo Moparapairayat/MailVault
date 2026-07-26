@@ -67,8 +67,8 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({ openSubmitModa
   const [withdrawNotice, setWithdrawNotice] = useState<{ success: boolean; text: string } | null>(null);
 
   // Filter Submissions for current seller
-  const sellerId = currentUser ? currentUser.id : 'usr-seller-1';
-  const mySubmissions = submissions.filter(s => s.sellerId === sellerId);
+  const sellerId = currentUser ? currentUser.id : null;
+  const mySubmissions = sellerId ? submissions.filter(s => s.sellerId === sellerId) : [];
   const filteredSubmissions = mySubmissions.filter(s => {
     const matchesStatus = filterStatus === 'ALL' || s.status === filterStatus;
     const matchesSearch = s.email.toLowerCase().includes(searchQuery.toLowerCase()) || s.batchId.toLowerCase().includes(searchQuery.toLowerCase());
@@ -88,16 +88,18 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({ openSubmitModa
   };
 
   const sellerTier = getSellerTier(totalApprovedCount);
-  const refCode = currentUser?.refCode || 'karim88';
-  const refLink = `${window.location.origin}/?ref=${refCode}`;
+  const refCode = currentUser?.refCode || '';
+  const refLink = refCode ? `${window.location.origin}/?ref=${refCode}` : window.location.origin;
 
   const handleCopy = (text: string, id: string) => {
+    if (!text) return;
     navigator.clipboard.writeText(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
   };
 
   const handleCopyRef = () => {
+    if (!refLink) return;
     navigator.clipboard.writeText(refLink);
     setCopiedRef(true);
     setTimeout(() => setCopiedRef(false), 2000);
@@ -190,6 +192,7 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({ openSubmitModa
         activeSection={activeSection}
         setActiveSection={setActiveSection}
         openSubmitModal={() => openSubmitModal()}
+        totalApprovedCount={totalApprovedCount}
       />
 
       {/* Main Content Area - pb-24 for Mobile Bottom Bar clearance */}
@@ -199,17 +202,17 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({ openSubmitModa
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 bg-gradient-to-r from-dark-card via-dark-panel to-dark-card p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-brand-500/30">
           <div className="flex items-center gap-3 sm:gap-4">
             <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-brand-500/20 border border-brand-500/40 flex items-center justify-center text-brand-400 font-extrabold text-lg sm:text-xl shrink-0">
-              {currentUser ? currentUser.name.charAt(0).toUpperCase() : 'K'}
+              {currentUser?.name?.charAt(0).toUpperCase() || 'S'}
             </div>
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-xl sm:text-2xl font-black text-white">{currentUser ? currentUser.name : 'Karim Ahmed'}</h1>
+                <h1 className="text-xl sm:text-2xl font-black text-white">{currentUser?.name || 'Seller'}</h1>
                 <span className={`px-2 py-0.5 text-[9px] sm:text-[10px] font-extrabold uppercase border rounded-full ${sellerTier.color}`}>
                   {sellerTier.badge}
                 </span>
               </div>
               <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 font-medium">
-                Phone: <span className="text-slate-200 font-mono">{currentUser ? currentUser.phone : '01711223344'}</span> • Perk: <strong className="text-emerald-400">{sellerTier.perk}</strong>
+                Phone: <span className="text-slate-200 font-mono">{currentUser?.phone || 'N/A'}</span> • Perk: <strong className="text-emerald-400">{sellerTier.perk}</strong>
               </p>
             </div>
           </div>
@@ -333,7 +336,7 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({ openSubmitModa
                 <div className="text-xs text-slate-400 font-medium">Referral Earnings</div>
                 <div className="text-2xl sm:text-3xl font-black text-purple-400 mt-1">৳{referralEarnings.toLocaleString()}</div>
                 <p className="text-[10px] sm:text-[11px] text-slate-400 mt-4 leading-tight">
-                  Referred Sellers: <strong>{currentUser?.totalReferredCount || 4} Members</strong>
+                  Referred Sellers: <strong>{currentUser?.totalReferredCount || 0} Members</strong>
                 </p>
               </div>
 

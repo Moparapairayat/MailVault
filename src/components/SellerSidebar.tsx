@@ -6,12 +6,12 @@ interface SellerSidebarProps {
   activeSection: string;
   setActiveSection: (sec: string) => void;
   openSubmitModal: () => void;
+  totalApprovedCount?: number;
 }
 
-export const SellerSidebar: React.FC<SellerSidebarProps> = ({ activeSection, setActiveSection, openSubmitModal }) => {
+export const SellerSidebar: React.FC<SellerSidebarProps> = ({ activeSection, setActiveSection, openSubmitModal, totalApprovedCount = 0 }) => {
   const { currentUser, logoutUser, availableBalance } = useApp();
 
-  const totalApprovedCount = 120;
   const getSellerTier = (count: number) => {
     if (count >= 500) return '🥇 Gold VIP';
     if (count >= 50) return '🥈 Silver';
@@ -37,12 +37,12 @@ export const SellerSidebar: React.FC<SellerSidebarProps> = ({ activeSection, set
             <div className="w-10 h-10 rounded-xl bg-brand-500/20 border border-brand-500/40 flex items-center justify-center text-brand-400 font-extrabold text-sm">
               {currentUser ? currentUser.name.charAt(0).toUpperCase() : 'K'}
             </div>
-            <div className="overflow-hidden">
-              <div className="font-bold text-xs text-white truncate">{currentUser ? currentUser.name : 'Karim Ahmed'}</div>
-              <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-brand-500/10 text-brand-400 border border-brand-500/20 inline-block mt-0.5">
-                {getSellerTier(totalApprovedCount)}
-              </span>
-            </div>
+             <div className="overflow-hidden">
+               <div className="font-bold text-xs text-white truncate">{currentUser ? currentUser.name : 'Seller'}</div>
+               <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-brand-500/10 text-brand-400 border border-brand-500/20 inline-block mt-0.5">
+                 {getSellerTier(totalApprovedCount)}
+               </span>
+             </div>
           </div>
 
           {/* Action Button CTA */}

@@ -3,13 +3,12 @@ import { useApp } from '../context/AppContext';
 import { CategoryId, SubmissionStatus } from '../types';
 import { getTelegramConfig, saveTelegramConfig, sendTelegramAlert, TelegramConfig } from '../lib/telegram';
 import { AdminSidebar } from './AdminSidebar';
+import { AdminUserManagement } from './AdminUserManagement';
+import { AdminActivityLog } from './AdminActivityLog';
+import { AdminUserDetail } from './AdminUserDetail';
 import { Shield, Download, CheckCircle2, XCircle, Edit3, PauseCircle, PlayCircle, Search, Copy, Check, DollarSign, Filter, RefreshCw, Send, Bell, Cpu, BarChart3, PieChart, Sparkles, AlertTriangle, Layers, Lock, CreditCard } from 'lucide-react';
 
-interface AdminDashboardProps {
-  onLockVault?: () => void;
-}
-
-export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLockVault }) => {
+export const AdminDashboard: React.FC = () => {
   const {
     categories,
     submissions,
@@ -29,6 +28,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLockVault }) =
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<string>('overview');
+  const [viewingUserId, setViewingUserId] = useState<string | null>(null);
 
   // Payout Method Inputs
   const [newMethodName, setNewMethodName] = useState('');
@@ -68,14 +68,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLockVault }) =
   });
 
   // Stats Calculations
-  const totalSubmissions = submissions.length || 1;
+  const totalSubmissions = submissions.length;
   const totalApprovedCount = submissions.filter(s => s.status === 'APPROVED').length;
   const totalPendingCount = submissions.filter(s => s.status === 'PENDING').length;
   const totalRejectedCount = submissions.filter(s => s.status === 'REJECTED').length;
   
-  const approvedPct = Math.round((totalApprovedCount / totalSubmissions) * 100);
-  const pendingPct = Math.round((totalPendingCount / totalSubmissions) * 100);
-  const rejectedPct = Math.round((totalRejectedCount / totalSubmissions) * 100);
+  const approvedPct = totalSubmissions > 0 ? Math.round((totalApprovedCount / totalSubmissions) * 100) : 0;
+  const pendingPct = totalSubmissions > 0 ? Math.round((totalPendingCount / totalSubmissions) * 100) : 0;
+  const rejectedPct = totalSubmissions > 0 ? Math.round((totalRejectedCount / totalSubmissions) * 100) : 0;
 
   const totalPaidOutAmount = withdrawals.filter(w => w.status === 'COMPLETED').reduce((acc, curr) => acc + curr.amount, 0);
   const pendingWithdrawalCount = withdrawals.filter(w => w.status === 'PENDING').length;
@@ -91,7 +91,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLockVault }) =
   const handleRunAutoCredentialCheck = async () => {
     const targetItems = filteredSubmissions.filter(s => s.status === 'PENDING');
     if (targetItems.length === 0) {
-      alert('No pending emails found in current filter to test.');
+      setCheckerLog(prev => [`[INFO] No pending emails found in current filter to test.`, ...prev.slice(0, 15)]);
       return;
     }
 
@@ -177,14 +177,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLockVault }) =
   return (
     <div className="flex flex-col md:flex-row min-h-[calc(100vh-5rem)]">
       
-      {/* Collapsible Admin Sidebar */}
+      {/* Admin Sidebar */}
       <AdminSidebar
         currentTab={activeTab}
         setCurrentTab={setActiveTab}
-        onLockVault={onLockVault || (() => {
-          localStorage.removeItem('mailvault_admin_unlocked');
-          window.location.reload();
-        })}
       />
 
       {/* Main Content Area - pb-24 for Mobile Bottom Bar clearance */}
@@ -281,6 +277,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLockVault }) =
               </div>
             </div>
           </div>
+        )}
+
+        {/* Tab: User Management */}
+        {activeTab === 'users' && !viewingUserId && (
+          <AdminUserManagement onViewUser={(userId) => setViewingUserId(userId)} />
+        )}
+        {viewingUserId && (
+          <AdminUserDetail userId={viewingUserId} onBack={() => setViewingUserId(null)} />
+        )}
+
+        {/* Tab: Admin Activity Log */}
+        {activeTab === 'activity' && (
+          <AdminActivityLog />
         )}
 
         {/* Tab 2: Financial & Inventory Analytics */}
@@ -760,7 +769,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLockVault }) =
                         <td className="py-4 px-4">
                           <div className="font-mono text-white font-bold">{item.email}</div>
                           <div className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-2">
-                            <span>Password: <strong className="text-slate-200">{item.password}</strong></span>
                             {item.recoveryEmail && <span>Recov: <strong className="text-slate-200">{item.recoveryEmail}</strong></span>}
                           </div>
                           <div className="text-[10px] text-slate-500 mt-0.5">

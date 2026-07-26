@@ -1,15 +1,14 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
-import { Shield, Cpu, BarChart3, Edit3, Bell, Send, Layers, CreditCard, Lock } from 'lucide-react';
+import { Shield, Cpu, BarChart3, Edit3, Bell, Send, Layers, CreditCard, Users, Activity } from 'lucide-react';
 
 interface AdminSidebarProps {
   currentTab: string;
   setCurrentTab: (tab: string) => void;
-  onLockVault: () => void;
 }
 
-export const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentTab, setCurrentTab, onLockVault }) => {
-  const { submissions, withdrawals } = useApp();
+export const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentTab, setCurrentTab }) => {
+  const { submissions, withdrawals, adminActivityLogs } = useApp();
 
   const pendingSubmissions = submissions.filter(s => s.status === 'PENDING').length;
   const pendingWithdrawals = withdrawals.filter(w => w.status === 'PENDING').length;
@@ -20,6 +19,8 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentTab, setCurre
     { id: 'analytics', label: 'Financial Analytics', icon: BarChart3 },
     { id: 'rates', label: 'Buying Rates & Stock', icon: Edit3 },
     { id: 'submissions', label: 'Email Review Vault', icon: Layers, badge: pendingSubmissions > 0 ? `${pendingSubmissions}` : undefined, badgeColor: 'bg-amber-500 text-slate-950 font-black' },
+    { id: 'users', label: 'User Management', icon: Users },
+    { id: 'activity', label: 'Admin Activity Log', icon: Activity, badge: adminActivityLogs.length > 0 ? `${Math.min(adminActivityLogs.length, 99)}` : undefined, badgeColor: 'bg-purple-500 text-white font-black' },
     { id: 'payouts', label: 'Payout Releases', icon: CreditCard, badge: pendingWithdrawals > 0 ? `${pendingWithdrawals}` : undefined, badgeColor: 'bg-accent-cyan text-slate-950 font-black' },
     { id: 'notices', label: 'Notice & Announcements', icon: Bell },
     { id: 'telegram', label: 'Telegram Alert Bot', icon: Send },
@@ -74,17 +75,6 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentTab, setCurre
             })}
           </div>
 
-        </div>
-
-        {/* Lock Session Button */}
-        <div className="pt-4 border-t border-dark-border space-y-2">
-          <button
-            onClick={onLockVault}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 transition-all"
-          >
-            <Lock className="w-4 h-4" />
-            <span>Lock Admin Vault</span>
-          </button>
         </div>
       </aside>
 

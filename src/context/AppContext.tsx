@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { EmailCategory, EmailItem, WithdrawalRequest, UserRole, CategoryId, PaymentMethod, SubmissionStatus, UserProfile, AnnouncementNotice, PayoutMethodConfig } from '../types';
+import { EmailCategory, EmailItem, WithdrawalRequest, UserRole, CategoryId, PaymentMethod, SubmissionStatus, UserProfile, AnnouncementNotice, PayoutMethodConfig, SellerActivityLog, AdminActivityLog } from '../types';
 import { INITIAL_CATEGORIES } from '../mockData';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { sendTelegramAlert } from '../lib/telegram';
@@ -47,6 +47,21 @@ interface AppContextType {
   // Announcement Actions
   addAnnouncement: (text: string, type: 'INFO' | 'BONUS' | 'WARNING') => void;
   deleteAnnouncement: (id: string) => void;
+
+  // User Management
+  users: UserProfile[];
+  fetchUsers: () => Promise<{ success: boolean; message?: string }>;
+  updateUserRole: (userId: string, newRole: 'SELLER' | 'ADMIN') => Promise<{ success: boolean; message: string }>;
+  banUser: (userId: string, reason: string) => Promise<{ success: boolean; message: string }>;
+  unbanUser: (userId: string) => Promise<{ success: boolean; message: string }>;
+  resetUserPassword: (userId: string, newPassword: string) => Promise<{ success: boolean; message: string }>;
+  deleteUser: (userId: string) => Promise<{ success: boolean; message: string }>;
+
+  // Activity Logs
+  sellerActivityLogs: SellerActivityLog[];
+  adminActivityLogs: AdminActivityLog[];
+  logSellerActivity: (sellerId: string, sellerName: string, actionType: 'LOGIN' | 'SUBMISSION' | 'WITHDRAWAL_REQUEST' | 'PROFILE_UPDATE', details: string) => Promise<void>;
+  logAdminActivity: (adminId: string, adminName: string, actionType: AdminActivityLog['actionType'], details: string, targetUserId?: string, targetUserName?: string) => Promise<void>;
   
   // Calculated Stats
   availableBalance: number;
@@ -134,6 +149,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Withdrawals — loaded from Supabase only
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
+
+  // Users — loaded from Supabase only
+  const [users, setUsers] = useState<UserProfile[]>([]);
+
+  // Seller Activity Logs — loaded from Supabase only
+  const [sellerActivityLogs, setSellerActivityLogs] = useState<SellerActivityLog[]>([]);
+
+  // Admin Activity Logs — loaded from Supabase only
+  const [adminActivityLogs, setAdminActivityLogs] = useState<AdminActivityLog[]>([]);
 
   // Track Referral Code from URL
   useEffect(() => {
@@ -240,6 +264,56 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             createdAt: a.created_at
           })));
         }
+
+        const { data: userData } = await client.from('profiles').select('*').order('created_at', { ascending: false });
+        if (userData) {
+          setUsers(userData.map(u => ({
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            phone: u.phone || '',
+            role: u.role || 'SELLER',
+            refCode: u.ref_code || '',
+            username: u.username,
+            referredBy: u.referred_by,
+            referralEarnings: u.referral_earnings || 0,
+            totalReferredCount: u.total_referred_count || 0,
+            defaultBkash: u.default_bkash,
+            defaultNagad: u.default_nagad,
+            defaultRocket: u.default_rocket,
+            defaultUsdt: u.default_usdt,
+            createdAt: u.created_at,
+            isBanned: u.is_banned,
+            bannedReason: u.banned_reason,
+            lastLoginAt: u.last_login_at
+          })));
+        }
+
+        const { data: sellerLogs } = await client.from('seller_activity_logs').select('*').order('created_at', { ascending: false }).limit(100);
+        if (sellerLogs) {
+          setSellerActivityLogs(sellerLogs.map(l => ({
+            id: l.id,
+            sellerId: l.seller_id,
+            sellerName: l.seller_name,
+            actionType: l.action_type,
+            details: l.details,
+            createdAt: l.created_at
+          })));
+        }
+
+        const { data: adminLogs } = await client.from('admin_activity_logs').select('*').order('created_at', { ascending: false }).limit(100);
+        if (adminLogs) {
+          setAdminActivityLogs(adminLogs.map(l => ({
+            id: l.id,
+            adminId: l.admin_id,
+            adminName: l.admin_name,
+            actionType: l.action_type,
+            targetUserId: l.target_user_id,
+            targetUserName: l.target_user_name,
+            details: l.details,
+            createdAt: l.created_at
+          })));
+        }
       } catch (err) {
         console.warn('Supabase fetch error, falling back to local state:', err);
       }
@@ -253,6 +327,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, () => fetchFromSupabase())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'payout_methods' }, () => fetchFromSupabase())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => fetchFromSupabase())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => fetchFromSupabase())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'seller_activity_logs' }, () => fetchFromSupabase())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_activity_logs' }, () => fetchFromSupabase())
       .subscribe();
 
     return () => {
@@ -322,6 +399,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       setCurrentUser(user);
       localStorage.setItem('mailvault_current_user', JSON.stringify(user));
+      logSellerActivity(user.id, user.name, 'LOGIN', `Logged in via ${data.username ? 'username' : 'email'} (${data.email})`);
       return { success: true, message: 'Logged in successfully!' };
     }
 
@@ -334,6 +412,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const { password: _, ...userWithoutPass } = savedUser;
     setCurrentUser(userWithoutPass);
     localStorage.setItem('mailvault_current_user', JSON.stringify(userWithoutPass));
+    logSellerActivity(userWithoutPass.id, userWithoutPass.name, 'LOGIN', `Logged in via ${userWithoutPass.username ? 'username' : 'email'} (${userWithoutPass.email})`);
     return { success: true, message: 'Logged in successfully!' };
   };
 
@@ -461,6 +540,177 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true, message: 'Admin account created successfully!' };
   };
 
+  // User Management Methods
+  const fetchUsers = async () => {
+    const client = supabase;
+    if (isSupabaseConfigured && client) {
+      const { data, error } = await client.from('profiles').select('*').order('created_at', { ascending: false });
+      if (error) {
+        console.error('Fetch users error:', error);
+        return { success: false, message: error.message };
+      }
+      if (data) {
+        setUsers(data.map(u => ({
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          phone: u.phone || '',
+          role: u.role || 'SELLER',
+          refCode: u.ref_code || '',
+          username: u.username,
+          referredBy: u.referred_by,
+          referralEarnings: u.referral_earnings || 0,
+          totalReferredCount: u.total_referred_count || 0,
+          defaultBkash: u.default_bkash,
+          defaultNagad: u.default_nagad,
+          defaultRocket: u.default_rocket,
+          defaultUsdt: u.default_usdt,
+          createdAt: u.created_at,
+          isBanned: u.is_banned,
+          bannedReason: u.banned_reason,
+          lastLoginAt: u.last_login_at
+        })));
+      }
+    }
+    return { success: true };
+  };
+
+  const updateUserRole = async (userId: string, newRole: 'SELLER' | 'ADMIN') => {
+    const client = supabase;
+    const targetUser = users.find(u => u.id === userId);
+    if (isSupabaseConfigured && client) {
+      const { error } = await client.from('profiles').update({ role: newRole }).eq('id', userId);
+      if (error) {
+        console.error('Update user role error:', error);
+        return { success: false, message: error.message };
+      }
+    }
+    setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
+    if (currentUser && targetUser) {
+      logAdminActivity(currentUser.id, currentUser.name, 'USER_ROLE_CHANGE', `Changed role to ${newRole}`, userId, targetUser.name);
+    }
+    return { success: true, message: 'User role updated successfully!' };
+  };
+
+  const banUser = async (userId: string, reason: string) => {
+    const client = supabase;
+    const targetUser = users.find(u => u.id === userId);
+    if (isSupabaseConfigured && client) {
+      const { error } = await client.from('profiles').update({ is_banned: true, banned_reason: reason }).eq('id', userId);
+      if (error) {
+        console.error('Ban user error:', error);
+        return { success: false, message: error.message };
+      }
+    }
+    setUsers(prev => prev.map(u => u.id === userId ? { ...u, isBanned: true, bannedReason: reason } : u));
+    if (currentUser && targetUser) {
+      logAdminActivity(currentUser.id, currentUser.name, 'USER_BAN', `Banned user. Reason: ${reason}`, userId, targetUser.name);
+    }
+    return { success: true, message: 'User banned successfully!' };
+  };
+
+  const unbanUser = async (userId: string) => {
+    const client = supabase;
+    const targetUser = users.find(u => u.id === userId);
+    if (isSupabaseConfigured && client) {
+      const { error } = await client.from('profiles').update({ is_banned: false, banned_reason: null }).eq('id', userId);
+      if (error) {
+        console.error('Unban user error:', error);
+        return { success: false, message: error.message };
+      }
+    }
+    setUsers(prev => prev.map(u => u.id === userId ? { ...u, isBanned: false, bannedReason: undefined } : u));
+    if (currentUser && targetUser) {
+      logAdminActivity(currentUser.id, currentUser.name, 'USER_UNBAN', `Unbanned user`, userId, targetUser.name);
+    }
+    return { success: true, message: 'User unbanned successfully!' };
+  };
+
+  const resetUserPassword = async (userId: string, newPassword: string) => {
+    if (!newPassword || newPassword.length < 6) {
+      return { success: false, message: 'Password must be at least 6 characters.' };
+    }
+    const client = supabase;
+    const targetUser = users.find(u => u.id === userId);
+    if (isSupabaseConfigured && client) {
+      const { error } = await client.from('profiles').update({ password: newPassword }).eq('id', userId);
+      if (error) {
+        console.error('Reset password error:', error);
+        return { success: false, message: error.message };
+      }
+    }
+    if (currentUser && targetUser) {
+      logAdminActivity(currentUser.id, currentUser.name, 'PASSWORD_RESET', `Reset password for user`, userId, targetUser.name);
+    }
+    return { success: true, message: 'Password reset successfully!' };
+  };
+
+  const deleteUser = async (userId: string) => {
+    const client = supabase;
+    const targetUser = users.find(u => u.id === userId);
+    if (isSupabaseConfigured && client) {
+      const { error } = await client.from('profiles').delete().eq('id', userId);
+      if (error) {
+        console.error('Delete user error:', error);
+        return { success: false, message: error.message };
+      }
+    }
+    setUsers(prev => prev.filter(u => u.id !== userId));
+    if (currentUser && targetUser) {
+      logAdminActivity(currentUser.id, currentUser.name, 'USER_DELETE', `Deleted user permanently`, userId, targetUser.name);
+    }
+    return { success: true, message: 'User deleted permanently!' };
+  };
+
+  // Activity Log Methods
+  const logSellerActivity = async (sellerId: string, sellerName: string, actionType: 'LOGIN' | 'SUBMISSION' | 'WITHDRAWAL_REQUEST' | 'PROFILE_UPDATE', details: string) => {
+    const logId = `sal-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const client = supabase;
+    if (isSupabaseConfigured && client) {
+      await client.from('seller_activity_logs').insert({
+        id: logId,
+        seller_id: sellerId,
+        seller_name: sellerName,
+        action_type: actionType,
+        details
+      });
+    }
+    setSellerActivityLogs(prev => [{
+      id: logId,
+      sellerId,
+      sellerName,
+      actionType,
+      details,
+      createdAt: new Date().toISOString()
+    }, ...prev].slice(0, 200));
+  };
+
+  const logAdminActivity = async (adminId: string, adminName: string, actionType: 'USER_ROLE_CHANGE' | 'USER_BAN' | 'USER_UNBAN' | 'USER_DELETE' | 'PASSWORD_RESET' | 'SUBMISSION_REVIEW' | 'WITHDRAWAL_PROCESS' | 'CATEGORY_UPDATE', details: string, targetUserId?: string, targetUserName?: string) => {
+    const logId = `aal-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const client = supabase;
+    if (isSupabaseConfigured && client) {
+      await client.from('admin_activity_logs').insert({
+        id: logId,
+        admin_id: adminId,
+        admin_name: adminName,
+        action_type: actionType,
+        target_user_id: targetUserId,
+        target_user_name: targetUserName,
+        details
+      });
+    }
+    setAdminActivityLogs(prev => [{
+      id: logId,
+      adminId,
+      adminName,
+      actionType,
+      targetUserId,
+      targetUserName,
+      details,
+      createdAt: new Date().toISOString()
+    }, ...prev].slice(0, 200));
+  };
+
   const registerUser = async (email: string, pass: string, name: string, phone: string) => {
     if (!email || !pass || !name || !phone) {
       return { success: false, message: 'Please fill all required fields.' };
@@ -578,8 +828,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateUserProfile = async (updatedFields: Partial<UserProfile>) => {
     if (!currentUser) return { success: false, message: 'User not logged in.' };
     const updated = { ...currentUser, ...updatedFields };
+    
+    const client = supabase;
+    if (isSupabaseConfigured && client) {
+      const { error } = await client
+        .from('profiles')
+        .update({
+          name: updated.name,
+          phone: updated.phone,
+          default_bkash: updated.defaultBkash,
+          default_nagad: updated.defaultNagad,
+          default_rocket: updated.defaultRocket,
+          default_usdt: updated.defaultUsdt
+        })
+        .eq('id', updated.id);
+      
+      if (error) {
+        console.error('Profile update DB error:', error);
+        return { success: false, message: `Failed to update profile: ${error.message}` };
+      }
+    }
+    
     setCurrentUser(updated);
     localStorage.setItem('mailvault_current_user', JSON.stringify(updated));
+    logSellerActivity(updated.id, updated.name, 'PROFILE_UPDATE', 'Updated profile information');
     return { success: true, message: 'Profile updated successfully!' };
   };
 
@@ -709,6 +981,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const { error } = await client.from('email_submissions').insert(dbPayloads);
       if (error) {
         console.error('Supabase batch insert error:', error);
+        return { success: false, added: 0, duplicates: duplicateCount, message: `Database error: ${error.message}` };
       }
     }
 
@@ -731,6 +1004,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
     
     playSuccessSound();
+
+    logSellerActivity(currentSellerId, currentSellerName, 'SUBMISSION', `Submitted ${newItems.length} ${category.name} emails (Batch: ${batchId})`);
 
     return {
       success: true,
@@ -766,7 +1041,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const client = supabase;
     if (isSupabaseConfigured && client) {
-      await client.from('withdrawals').insert({
+      const { error } = await client.from('withdrawals').insert({
         id: reqId,
         seller_id: currentSellerId,
         seller_name: currentSellerName,
@@ -776,6 +1051,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         requested_at: new Date().toISOString(),
         status: 'PENDING'
       });
+      if (error) {
+        console.error('Withdrawal insert error:', error);
+        return { success: false, message: `Database error: ${error.message}` };
+      }
     }
 
     setWithdrawals(prev => [newReq, ...prev]);
@@ -792,16 +1071,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Play Cha-ching cash sound FX
     playCashSound();
 
+    logSellerActivity(currentSellerId, currentSellerName, 'WITHDRAWAL_REQUEST', `Requested withdrawal of ৳${amount} via ${method.toUpperCase()}`);
+
     return { success: true, message: `Withdrawal request of ৳${amount} submitted! Admin will process via ${method.toUpperCase()}.` };
   };
 
   // Admin Actions
   const updateCategoryRate = async (categoryId: CategoryId, newRate: number) => {
     const client = supabase;
+    const target = categories.find(c => c.id === categoryId);
     if (isSupabaseConfigured && client) {
       await client.from('categories').update({ rate_per_unit: newRate }).eq('id', categoryId);
     }
     setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, ratePerUnit: newRate } : c));
+    if (currentUser && target) {
+      logAdminActivity(currentUser.id, currentUser.name, 'CATEGORY_UPDATE', `Updated rate for ${target.name} to ৳${newRate}`);
+    }
   };
 
   const toggleCategoryStatus = async (categoryId: CategoryId) => {
@@ -814,14 +1099,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       await client.from('categories').update({ status: nextStatus }).eq('id', categoryId);
     }
     setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, status: nextStatus } : c));
+    if (currentUser && target) {
+      logAdminActivity(currentUser.id, currentUser.name, 'CATEGORY_UPDATE', `Toggled ${target.name} to ${nextStatus}`);
+    }
   };
 
   const reviewSubmission = async (itemId: string, status: SubmissionStatus, reason?: string) => {
     const client = supabase;
+    const item = submissions.find(s => s.id === itemId);
     if (isSupabaseConfigured && client) {
       await client.from('email_submissions').update({ status, rejection_reason: reason }).eq('id', itemId);
     }
-    setSubmissions(prev => prev.map(item => item.id === itemId ? { ...item, status, rejectionReason: reason } : item));
+    setSubmissions(prev => prev.map(i => i.id === itemId ? { ...i, status, rejectionReason: reason } : i));
+    if (currentUser && item) {
+      logAdminActivity(currentUser.id, currentUser.name, 'SUBMISSION_REVIEW', `${status === 'APPROVED' ? 'Approved' : 'Rejected'} submission from ${item.sellerName} (${item.email})${reason ? `: ${reason}` : ''}`, item.sellerId, item.sellerName);
+    }
   };
 
   const reviewBatchSubmissions = async (itemIds: string[], status: SubmissionStatus, reason?: string) => {
@@ -831,10 +1123,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       await client.from('email_submissions').update({ status, rejection_reason: reason }).in('id', itemIds);
     }
     setSubmissions(prev => prev.map(item => idSet.has(item.id) ? { ...item, status, rejectionReason: reason } : item));
+    if (currentUser && itemIds.length > 0) {
+      const sample = submissions.find(s => s.id === itemIds[0]);
+      logAdminActivity(currentUser.id, currentUser.name, 'SUBMISSION_REVIEW', `Batch ${status === 'APPROVED' ? 'approved' : 'rejected'} ${itemIds.length} submissions${reason ? `: ${reason}` : ''}`, sample?.sellerId, sample?.sellerName);
+    }
   };
 
   const processWithdrawal = async (withdrawalId: string, status: 'COMPLETED' | 'REJECTED', txId?: string) => {
     const client = supabase;
+    const withdrawal = withdrawals.find(w => w.id === withdrawalId);
     if (isSupabaseConfigured && client) {
       await client.from('withdrawals').update({
         status,
@@ -848,6 +1145,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       transactionId: txId || w.transactionId,
       processedAt: new Date().toISOString()
     } : w));
+    if (currentUser && withdrawal) {
+      logAdminActivity(currentUser.id, currentUser.name, 'WITHDRAWAL_PROCESS', `Marked withdrawal ৳${withdrawal.amount} as ${status}${txId ? ` with TrxID ${txId}` : ''}`, withdrawal.sellerId, withdrawal.sellerName);
+    }
   };
 
   const exportApprovedEmails = (categoryId?: CategoryId) => {
@@ -857,7 +1157,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     if (filtered.length === 0) {
-      alert('No approved emails found to export.');
       return;
     }
 
@@ -867,7 +1166,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const link = document.createElement('a');
     link.href = url;
     link.download = `MailVault_Approved_Emails_${categoryId || 'ALL'}_${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
 
@@ -903,6 +1204,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         exportApprovedEmails,
         addAnnouncement,
         deleteAnnouncement,
+        users,
+        fetchUsers,
+        updateUserRole,
+        banUser,
+        unbanUser,
+        resetUserPassword,
+        deleteUser,
+        sellerActivityLogs,
+        adminActivityLogs,
+        logSellerActivity,
+        logAdminActivity,
         availableBalance,
         pendingBalance,
         totalWithdrawn,
